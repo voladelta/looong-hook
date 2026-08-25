@@ -1,0 +1,686 @@
+# foundry - Ethereum Development Framework
+
+Documentation for Foundry's Forge, Cast, Anvil, and Chisel Ethereum development tools.
+
+- [Installation](/introduction/installation): Install Foundry using foundryup, precompiled binaries, or build from source.
+- [Getting Started](/introduction/getting-started): Get started with Foundry's four core tools - Forge, Cast, Anvil, and Chisel.
+- [Prompting](/introduction/prompting): Use structured prompts to get better results from AI coding assistants.
+- [Foundry documentation for agents](/introduction/agents): Retrieve Foundry documentation efficiently from AI agents and other automated tools.
+- [Project Setup](/projects/): Create and configure Foundry projects for smart contract development.
+- [Project Layout](/projects/layout): Understand Foundry's project structure and directory conventions.
+- [Dependencies](/projects/dependencies): Manage dependencies using git submodules and remappings.
+- [Soldeer](/projects/soldeer): Use Soldeer as an alternative package manager for Foundry projects.
+- [Forge](/forge/): Forge is Foundry's build, test, and deploy tool for Solidity smart contracts.
+- [Building contracts](/forge/build): Compile Solidity contracts with Forge.
+- [Cloning verified contracts](/forge/cloning): Clone explorer-verified Solidity source into a Forge project, including a proxy's implementation.
+- [Contract Documentation](/forge/documentation): Generate and publish contract API documentation from Solidity NatSpec comments.
+- [Contract bindings](/forge/contract-bindings): Generate typed Rust contract bindings and Solidity JSON helpers from a Foundry project.
+- [Testing](/forge/testing): Write and run tests for Solidity contracts with Forge.
+- [Scripting](/forge/scripting): Deploy and interact with contracts using Forge scripts.
+- [Debugging](/forge/debugging): Debug Solidity contracts with Forge traces and the interactive debugger.
+- [Gas tracking](/forge/gas-tracking): Track and compare gas usage with Forge snapshots and reports.
+- [Formatting](/forge/formatting): Format Solidity code with Forge.
+- [Linting](/forge/linting): Lint Solidity code with Forge.
+- [Cast](/cast/): Cast is Foundry's command-line tool for interacting with Ethereum.
+- [Reading chain data](/cast/reading-chain-data): Query blockchain data with Cast — blocks, transactions, logs, and account state.
+- [Sending transactions](/cast/sending-transactions): Send transactions and interact with contracts using Cast.
+- [Wallet operations](/cast/wallet-operations): Manage wallets, sign messages, and verify signatures with Cast.
+- [EIP-7702 account delegation](/cast/eip-7702-delegation): Sign, submit, verify, and clear EIP-7702 account delegations with Cast.
+- [ABI encoding](/cast/abi-encoding): Encode and decode ABI data, calldata, and function signatures with Cast.
+- [Anvil](/anvil/): Anvil is Foundry's local Ethereum node for development and testing.
+- [Forking](/anvil/forking): Fork mainnet or any EVM-compatible chain with Anvil.
+- [Mining and Transaction Pool](/anvil/mining): Control Anvil mining, inspect pending transactions, and build deterministic local workflows.
+- [State management](/anvil/state-management): Dump and load Anvil chain state for reproducible testing.
+- [Custom methods](/anvil/custom-methods): Anvil's custom RPC methods for impersonation, mining control, and state manipulation.
+- [RPC method reference](/anvil/rpc-methods): Complete reference for Anvil's custom anvil_* and evm_* RPC methods and nonstandard eth_ extensions.
+- [Chisel](/chisel/): Chisel is Foundry's interactive Solidity REPL for rapid prototyping and debugging.
+- [Session management](/chisel/session-management): Save, load, and export Chisel REPL sessions.
+- [Forking](/chisel/forking): Fork live chains in Chisel to interact with deployed contracts.
+- [Commands](/chisel/commands): All available commands in the Chisel REPL.
+- [FAQ](/help/faq): Frequently asked questions about Foundry and its tools.
+- [Troubleshooting](/help/troubleshooting): Solutions to common Foundry errors and issues.
+- [Configuration](/config/): Configure Foundry with foundry.toml, profiles, and environment variables.
+- [Profiles](/config/profiles): Use profiles to switch between configurations for development, CI, and production.
+- [Compiler](/config/compiler): Configure the Solidity compiler settings for your Foundry project.
+- [Testing](/config/testing): Configure testing behavior including fuzz testing and invariant testing.
+- [MESC](/config/mesc): Use MESC to manage RPC endpoints across all your crypto tools from a single configuration file.
+- [CI Integration](/config/ci): Set up Foundry in GitHub Actions and other CI systems.
+- [Editor Setup](/config/editors): Configure VS Code, Vim, and other editors for Foundry projects.
+- [Best Practices](/best-practices): Best practices for writing contracts, tests, scripts, and managing security in Foundry projects.
+- [Guides](/guides/): Practical guides for common Foundry workflows and advanced patterns.
+- [Deploying Contracts](/guides/deploying-contracts): Deploy contracts from local development to testnet and mainnet with verification and deterministic addresses.
+- [Browser Wallet Signing](/guides/browser-wallet): Use an injected browser wallet with Cast and Forge.
+- [Deterministic Deployments with CREATE2](/guides/deterministic-deployments-using-create2): Deploy smart contracts to predictable addresses across multiple networks using CREATE2 opcode for counterfactual interactions.
+- [Multi-Chain Deployments](/guides/multi-chain-deployments): Deploy the same contracts across multiple networks with per-chain configuration.
+- [Upgrading Contracts](/guides/upgrading-contracts): Implement proxy patterns with Forge scripts and verify storage layout compatibility.
+- [Code Coverage](/guides/coverage): Generate accurate summaries, LCOV files, and per-test coverage attribution.
+- [Fork Testing](/guides/fork-testing): Test against live chain state, impersonate accounts, and handle time-sensitive logic.
+- [Fuzz Corpus Workflow](/guides/fuzz-corpus): Persist, replay, inspect, and minimize fuzz and invariant corpora.
+- [Mutation testing](/guides/mutation-testing): Evaluate the strength of a Forge test suite by configuring, running, and interpreting mutation tests.
+- [Invariant Testing](/guides/invariant-testing): Write effective invariant tests with handler patterns and ghost variables.
+- [Symbolic Testing Workflow](/guides/symbolic-testing): Turn symbolic counterexamples into reproducible tests and durable CI artifacts.
+- [Branching Tree Technique](/guides/branching-tree-technique): Organize Solidity tests as decision trees with the Branching Tree Technique and Bulloak.
+- [Foundry on Tempo](/guides/tempo): Use Foundry's upstream Tempo support to configure projects, send Tempo transactions, manage tokens, policies, keychains, and debug local Tempo workflows.
+- [MPP-backed RPC endpoints](/guides/mpp): Use Foundry with HTTP 402 payment-gated RPC endpoints through the Machine Payments Protocol (MPP).
+- [Debugging Transactions](/guides/debugging-transactions): Replay and debug failed mainnet transactions with trace analysis.
+- [Gas Optimization](/guides/gas-optimization): Profile gas usage and optimize with snapshots and the IR pipeline.
+- [Stack Too Deep](/guides/stack-too-deep): Understanding and resolving the "Stack too deep" compilation error in Solidity.
+- [Docker & Containers](/guides/docker): Run Foundry in Docker for reproducible builds and CI environments.
+- [Foundry v1.0 migration guide](/guides/migrations/foundry-v1): Summary of breaking changes and migration steps for Foundry v1.0.
+- [Arbitrary ERC20 send](/forge/linting/arbitrary-send-erc20): Arbitrary ERC20 send
+- [Arbitrary from in transferFrom used with permit](/forge/linting/arbitrary-send-erc20-permit): Arbitrary ERC20 send with permit
+- [Arbitrary Send ETH](/forge/linting/arbitrary-send-eth): Arbitrary ETH send
+- [Controlled delegatecall](/forge/linting/controlled-delegatecall): Controlled delegatecall target
+- [Encode Packed Collision](/forge/linting/encode-packed-collision): Hash collision from abi.encodePacked with multiple dynamic arguments
+- [Enumerable loop removal](/forge/linting/enumerable-loop-removal): EnumerableSet removal while iterating with at
+- [Unchecked ERC20 transfer return value](/forge/linting/erc20-unchecked-transfer): Unchecked ERC20 transfer return value
+- [Function selector collision](/forge/linting/function-selector-collision): Function selector collision
+- [Incorrect exponentiation](/forge/linting/incorrect-exp): Incorrect exponentiation
+- [Incorrect Yul shift order](/forge/linting/incorrect-shift): Incorrect shift order
+- [Protected variables](/forge/linting/protected-vars): State writes that bypass declared protection
+- [Reentrancy through stale contract balance checks](/forge/linting/reentrancy-balance): Reentrancy through stale contract balance checks
+- [ETH reentrancy through uncapped calls](/forge/linting/reentrancy-eth): ETH reentrancy through uncapped calls
+- [Right-to-left override character](/forge/linting/rtlo): Right-to-left override character
+- [Unchecked low-level call](/forge/linting/unchecked-call): Unchecked low-level call
+- [Unprotected initializer](/forge/linting/unprotected-initializer): Unprotected upgradeable initializer
+- [Assert state change](/forge/linting/assert-state-change): State-modifying expression inside assert()
+- [Misuse of a boolean constant](/forge/linting/boolean-cst): Misuse of a boolean constant
+- [Dangerous unary operator](/forge/linting/dangerous-unary-operator): Unary operator fused to assignment
+- [Divide before multiply](/forge/linting/divide-before-multiply): Divide before multiply
+- [Unsafe ecrecover](/forge/linting/ecrecover): Unsafe use of Solidity's ecrecover builtin
+- [Incorrect ERC20 interface](/forge/linting/incorrect-erc20-interface): Incorrect ERC20 interface
+- [Incorrect ERC721 interface](/forge/linting/incorrect-erc721-interface): Incorrect ERC721 interface
+- [Incorrect Strict Equality](/forge/linting/incorrect-strict-equality): Dangerous strict equality check on an externally-influenced value
+- [Locked Ether](/forge/linting/locked-ether): Contract receives ETH but has no way to send it out
+- [Low-level calls](/forge/linting/low-level-calls): Low-level calls
+- [Mapping deletion](/forge/linting/mapping-deletion): Mapping deletion
+- [Non-reentrant modifier not first](/forge/linting/non-reentrant-not-first): nonReentrant modifier is not first
+- [No-ETH read-before-write reentrancy](/forge/linting/reentrancy-no-eth): No-ETH read-before-write reentrancy
+- [Tautological compare](/forge/linting/tautological-compare): Tautological compare
+- [Use of tx.origin for authorization](/forge/linting/tx-origin): Use of tx.origin for authorization
+- [Type-Based Tautology](/forge/linting/type-based-tautology): Type-based tautological comparison
+- [Uninitialized local variable](/forge/linting/uninitialized-local): Uninitialized local variable
+- [Uninitialized State Variables](/forge/linting/uninitialized-state): Uninitialized state variable
+- [Unsafe OZ ERC721 mint](/forge/linting/unsafe-oz-erc721-mint): ERC721 _mint without receiver check
+- [Unsafe typecast](/forge/linting/unsafe-typecast): Unsafe typecast
+- [Unused return value](/forge/linting/unused-return): Unused return value from an external call
+- [Weak pseudo-random number generation](/forge/linting/weak-prng): Weak pseudo-random number generation
+- [Use of block.timestamp in comparisons](/forge/linting/block-timestamp): Use of block.timestamp in comparisons
+- [External call inside a loop](/forge/linting/calls-loop): External calls inside loops
+- [Delegatecall inside payable loop](/forge/linting/delegatecall-loop): Delegatecall inside payable loops
+- [Deprecated OpenZeppelin function](/forge/linting/deprecated-oz-function): Deprecated OpenZeppelin function
+- [Empty block](/forge/linting/empty-block): Empty function body
+- [Incorrect Modifier](/forge/linting/incorrect-modifier): Incorrect modifier
+- [Inconsistent type names](/forge/linting/inconsistent-type-names): Inconsistent type names
+- [Missing events access control](/forge/linting/missing-events-access-control): Missing events for access control changes
+- [Missing events arithmetic](/forge/linting/missing-events-arithmetic): Missing events for arithmetic state changes
+- [Missing zero-address check](/forge/linting/missing-zero-check): Missing zero-address check
+- [Msg value inside loop](/forge/linting/msg-value-loop): msg.value inside loops
+- [Reentrancy Events](/forge/linting/reentrancy-events): Events emitted after external calls
+- [Require or revert inside a loop](/forge/linting/require-revert-in-loop): require or revert inside loops
+- [Return bomb](/forge/linting/return-bomb): Return bomb
+- [Solmate SafeTransferLib](/forge/linting/solmate-safe-transfer-lib): Solmate SafeTransferLib does not check token code
+- [Boolean comparison to a constant](/forge/linting/boolean-equal): Boolean comparison to a constant
+- [Address event parameters should be indexed](/forge/linting/event-fields): Address event parameters should be indexed
+- [Function init state](/forge/linting/function-init-state): State variable initializer depends on state
+- [Inline assembly](/forge/linting/inline-assembly): Inline assembly usage
+- [Interface file naming](/forge/linting/interface-file-naming): Interface file naming
+- [Interface name should be prefixed with 'I'](/forge/linting/interface-naming): Interface name should be prefixed with 'I'
+- [Missing inheritance](/forge/linting/missing-inheritance): Missing inheritance from an implemented interface
+- [Function names should use mixedCase](/forge/linting/mixed-case-function): Function names should use mixedCase
+- [Mutable variable names should use mixedCase](/forge/linting/mixed-case-variable): Mutable variable names should use mixedCase
+- [Multiple contracts in one file](/forge/linting/multi-contract-file): Multiple contracts in one file
+- [Prefer named struct fields](/forge/linting/named-struct-fields): Prefer named struct fields
+- [Struct names should use PascalCase](/forge/linting/pascal-case-struct): Struct names should use PascalCase
+- [Inconsistent pragma directives](/forge/linting/pragma-inconsistent): Inconsistent pragma directives
+- [Redundant base-constructor call](/forge/linting/redundant-base-constructor-call): Redundant base-constructor call
+- [Reentrancy through fixed-gas ETH transfers](/forge/linting/reentrancy-unlimited-gas): Reentrancy through fixed-gas ETH transfers
+- [Constants should use SCREAMING_SNAKE_CASE](/forge/linting/screaming-snake-case-const): Constants should use SCREAMING_SNAKE_CASE
+- [Immutables should use SCREAMING_SNAKE_CASE](/forge/linting/screaming-snake-case-immutable): Immutables should use SCREAMING_SNAKE_CASE
+- [Numeric literal with too many digits](/forge/linting/too-many-digits): Numeric literal with too many digits
+- [Unaliased plain import](/forge/linting/unaliased-plain-import): Unaliased plain import
+- [Usage of unsafe cheatcodes](/forge/linting/unsafe-cheatcode): Usage of unsafe cheatcodes
+- [Literal instead of constant](/forge/linting/literal-instead-of-constant): Repeated literal that should be a named constant
+- [Modifier used only once](/forge/linting/modifier-used-only-once): Modifier invoked by exactly one function
+- [Internal function used once](/forge/linting/internal-function-used-once): Internal function referenced exactly once
+- [Cyclomatic complexity](/forge/linting/cyclomatic-complexity): Function complexity above the threshold
+- [Incorrect using-for](/forge/linting/incorrect-using-for): using-for directive that attaches nothing
+- [Unused error](/forge/linting/unused-error): Custom error is never used
+- [Unused import](/forge/linting/unused-import): Unused import
+- [TODO/FIXME comments](/forge/linting/todo-comment): TODO and FIXME markers left in comments
+- [Inefficient keccak256 call](/forge/linting/asm-keccak256): Inefficient keccak256 call
+- [Array length not cached](/forge/linting/cache-array-length): Array length not cached
+- [Costly operations inside a loop](/forge/linting/costly-loop): Costly operations inside a loop
+- [State variable could be constant](/forge/linting/could-be-constant): State variable could be constant
+- [State variable could be immutable](/forge/linting/could-be-immutable): State variable could be immutable
+- [Prefer custom errors over revert strings](/forge/linting/custom-errors): Prefer custom errors over revert strings
+- [External Function](/forge/linting/external-function): Public function can be declared external
+- [Unused state variable](/forge/linting/unused-state-variables): Unused state variable
+- [State variable read via this](/forge/linting/var-read-using-this): State variable read via `this`
+- [Write after write](/forge/linting/write-after-write): Redundant storage write; value overwritten before being read
+- [Unwrapped modifier logic](/forge/linting/unwrapped-modifier-logic): Unwrapped modifier logic
+- [forge](/reference/forge/forge): Build, test, fuzz, debug and deploy Solidity contracts
+- [forge build](/reference/forge/build): Build the project's smart contracts
+- [forge cache clean](/reference/forge/cache/clean): Cleans cached data from the global foundry directory
+- [forge clean](/reference/forge/clean): Remove the build artifacts and cache directories
+- [forge inspect](/reference/forge/inspect): Get specialized information about a smart contract
+- [forge soldeer clean](/reference/forge/soldeer/clean): Clean downloaded dependencies and generated artifacts
+- [forge create](/reference/forge/create): Deploy a smart contract
+- [forge flatten](/reference/forge/flatten): Flatten a source file and all of its imports into one file
+- [forge verify-check](/reference/forge/verify-check): Check verification status on the selected verifier
+- [forge verify-contract](/reference/forge/verify-contract): Verify smart contracts on Etherscan and Sourcify
+- [forge completions](/reference/forge/completions): Generate shell completions script
+- [forge clone](/reference/forge/clone): Clone a contract from Etherscan
+- [forge config](/reference/forge/config): Display the current config
+- [forge geiger](/reference/forge/geiger): DEPRECATED: Detects usage of unsafe cheat codes in a project and its dependencies. This is an alias for `forge lint --only-lint unsafe-cheatcode`.
+- [forge init](/reference/forge/init): Create a new Forge project
+- [forge install](/reference/forge/install): Install one or multiple dependencies. If no arguments are provided, then existing dependencies will be installed.
+- [forge remappings](/reference/forge/remappings): Get the automatically inferred remappings for the project
+- [forge remove](/reference/forge/remove): Remove one or multiple dependencies
+- [forge soldeer init](/reference/forge/soldeer/init): Convert a Foundry project to use Soldeer
+- [forge soldeer install](/reference/forge/soldeer/install): Install a dependency If used with arguments, a dependency will be added to the configuration. When used without argument, installs all dependencies that are missing. Examples: - Install all: soldeer install - Add from registry: soldeer install lib_name~2.3.0 - Add with custom URL: soldeer install lib_name~2.3.0 --url https://foo.bar/lib.zip - Add with git: soldeer install lib_name~2.3.0 --git git@github.com:foo/bar.git - Add with git (commit): soldeer install lib_name~2.3.0 --git git@github.com:foo/bar.git --rev 05f218fb6617932e56bf5388c3b389c3028a7b73 - Add with git (tag): soldeer install lib_name~2.3.0 --git git@github.com:foo/bar.git --tag v2.3.0 - Add with git (branch): soldeer install lib_name~2.3.0 --git git@github.com:foo/bar.git --branch feature/baz
+- [forge soldeer update](/reference/forge/soldeer/update): Update dependencies by reading the config file
+- [forge tree](/reference/forge/tree): Display a tree visualization of the project's dependency graph
+- [forge update](/reference/forge/update): Update one or multiple dependencies. If no arguments are provided, then all dependencies are updated.
+- [forge coverage](/reference/forge/coverage): Generate coverage reports Examples: - forge coverage - forge coverage --report lcov --report-file lcov.info - forge coverage --match-contract CounterTest
+- [forge snapshot](/reference/forge/snapshot): Create a gas snapshot of each test's gas usage Examples: - forge snapshot - forge snapshot --diff (compare against the existing .gas-snapshot file) - forge snapshot --check (fail if gas usage does not match .gas-snapshot)
+- [forge test](/reference/forge/test): Run the project's tests Examples: - forge test - forge test --match-test test_Increment -vvvv (show traces for a matching test) - forge test --match-contract CounterTest --fuzz-runs 1000
+- [forge bind](/reference/forge/bind): Generate Rust bindings for smart contracts
+- [forge bind-json](/reference/forge/bind-json): Generate bindings for serialization/deserialization of project structs via JSON cheatcodes
+- [forge cache](/reference/forge/cache): Manage the Foundry cache
+- [forge cache ls](/reference/forge/cache/ls): Shows cached data from the global foundry directory
+- [forge compiler](/reference/forge/compiler): Compiler utilities
+- [forge compiler resolve](/reference/forge/compiler/resolve): Retrieves the resolved version(s) of the compiler within the project
+- [forge doc](/reference/forge/doc): Generate documentation for the project
+- [forge eip712](/reference/forge/eip712): Generate EIP-712 struct encodings for structs from a given file
+- [forge fmt](/reference/forge/fmt): Format Solidity source files
+- [forge fuzz](/reference/forge/fuzz): Run and manage Forge fuzzing corpora
+- [forge fuzz cmin](/reference/forge/fuzz/cmin): Minimize a corpus by keeping entries that contribute new coverage
+- [forge fuzz replay](/reference/forge/fuzz/replay): Replay persisted fuzz failures, or corpus entries with `--corpus-dir`
+- [forge fuzz run](/reference/forge/fuzz/run): Run only fuzz and invariant tests
+- [forge fuzz show](/reference/forge/fuzz/show): Print persisted corpus entries
+- [forge fuzz tmin](/reference/forge/fuzz/tmin): Minimize one corpus entry while preserving its failure or coverage
+- [forge lint](/reference/forge/lint): Lint Solidity source files
+- [forge script](/reference/forge/script): Run a smart contract as a script, building transactions that can be sent onchain Examples: - forge script script/Counter.s.sol (simulate the script locally) - forge script script/Counter.s.sol --rpc-url $RPC_URL --broadcast --account dev - forge script script/Counter.s.sol --rpc-url $RPC_URL --resume
+- [forge selectors](/reference/forge/selectors): Function selector utilities
+- [forge selectors cache](/reference/forge/selectors/cache): Cache project selectors (enables trace with local contracts functions and events)
+- [forge selectors collision](/reference/forge/selectors/collision): Check for selector collisions between contracts
+- [forge selectors find](/reference/forge/selectors/find): Find if a selector is present in the project
+- [forge selectors list](/reference/forge/selectors/list): List selectors from current workspace
+- [forge selectors upload](/reference/forge/selectors/upload): Upload selectors to registry
+- [forge soldeer](/reference/forge/soldeer): Soldeer dependency manager
+- [forge soldeer login](/reference/forge/soldeer/login): Log into the central repository to push packages The credentials are saved by default into ~/.soldeer. If you want to overwrite that location, use the SOLDEER_LOGIN_FILE env var.
+- [forge soldeer push](/reference/forge/soldeer/push): Push a dependency to the soldeer.xyz repository. You need to be logged in first (soldeer login) or provide the `SOLDEER_API_TOKEN` environment variable with a valid CLI token generated on soldeer.xyz. Examples: - Current directory: soldeer push mypkg~0.1.0 - Custom directory: soldeer push mypkg~0.1.0 /path/to/dep - Dry run: soldeer push mypkg~0.1.0 --dry-run To ignore certain files, create a `.soldeerignore` file in the root of the project and add the files you want to ignore. The `.soldeerignore` uses the same syntax as `.gitignore`.
+- [forge soldeer uninstall](/reference/forge/soldeer/uninstall): Uninstall a dependency
+- [forge soldeer version](/reference/forge/soldeer/version): Display the version of Soldeer
+- [forge verify-bytecode](/reference/forge/verify-bytecode): Verify the deployed bytecode against its source on Etherscan
+- [cast](/reference/cast/cast): A Swiss Army knife for interacting with Ethereum applications from the command line
+- [cast 4byte](/reference/cast/4byte): Get the function signatures for the given selector from <https://openchain.xyz>
+- [cast 4byte-calldata](/reference/cast/4byte-calldata): Decode ABI-encoded calldata using <https://openchain.xyz>
+- [cast 4byte-event](/reference/cast/4byte-event): Get the event signature for a given topic 0 from <https://openchain.xyz>
+- [cast abi-encode](/reference/cast/abi-encode): ABI encode the given function argument, excluding the selector
+- [cast calldata](/reference/cast/calldata): ABI-encode a function with arguments
+- [cast decode-abi](/reference/cast/decode-abi): Decode ABI-encoded input or output data. Defaults to decoding output data. To decode input data pass --input. When passing `--input`, function selector must NOT be prefixed in `calldata` string
+- [cast decode-calldata](/reference/cast/decode-calldata): Decode ABI-encoded input data. Similar to `abi-decode --input`, but function selector MUST be prefixed in `calldata` string
+- [cast pretty-calldata](/reference/cast/pretty-calldata): Pretty print calldata. Tries to decode the calldata using <https://openchain.xyz> unless --offline is passed.
+- [cast selectors](/reference/cast/selectors): Extracts function selectors and arguments from bytecode
+- [cast upload-signature](/reference/cast/upload-signature): Upload the given signatures to <https://openchain.xyz>. Example inputs: - "transfer(address,uint256)" - "function transfer(address,uint256)" - "function transfer(address,uint256)" "event Transfer(address,address,uint256)" - "./out/Contract.sol/Contract.json"
+- [cast balance](/reference/cast/balance): Get the balance of an account in wei
+- [cast code](/reference/cast/code): Get the runtime bytecode of a contract
+- [cast codesize](/reference/cast/codesize): Get the runtime bytecode size of a contract
+- [cast erc20-token balance](/reference/cast/erc20-token/balance): Query ERC20 token balance
+- [cast nonce](/reference/cast/nonce): Get the nonce for an account
+- [cast proof](/reference/cast/proof): Generate a storage proof for a given storage slot
+- [cast receive-policy receipt balance](/reference/cast/receive-policy/receipt/balance): Query the held TIP-20 balance for a claim receipt
+- [cast storage](/reference/cast/storage): Get the raw value of a contract's storage slot
+- [cast storage-credits balance](/reference/cast/storage-credits/balance): Show an account's storage credit balance
+- [cast age](/reference/cast/age): Get the timestamp of a block
+- [cast block](/reference/cast/block): Get information about a block
+- [cast block-number](/reference/cast/block-number): Get the latest block number
+- [cast find-block](/reference/cast/find-block): Get the block number closest to the provided timestamp
+- [cast gas-price](/reference/cast/gas-price): Get the current gas price
+- [cast chain](/reference/cast/chain): Get the symbolic name of the current chain
+- [cast chain-id](/reference/cast/chain-id): Get the Ethereum chain ID
+- [cast client](/reference/cast/client): Get the current client version
+- [cast format-bytes32-string](/reference/cast/format-bytes32-string): Formats a string into bytes32 encoding
+- [cast from-bin](/reference/cast/from-bin): Convert binary data into hex data
+- [cast from-fixed-point](/reference/cast/from-fixed-point): Convert a fixed point number into an integer
+- [cast from-rlp](/reference/cast/from-rlp): Decodes RLP hex-encoded data
+- [cast from-utf8](/reference/cast/from-utf8): Convert UTF8 text to hex
+- [cast from-wei](/reference/cast/from-wei): Convert wei into an ETH amount. Consider using --to-unit.
+- [cast parse-bytes32-address](/reference/cast/parse-bytes32-address): Parses a checksummed address from bytes32 encoding.
+- [cast parse-bytes32-string](/reference/cast/parse-bytes32-string): Parses a string from bytes32 encoding
+- [cast shl](/reference/cast/shl): Perform a left shifting operation
+- [cast shr](/reference/cast/shr): Perform a right shifting operation
+- [cast to-ascii](/reference/cast/to-ascii): Convert hex data to an ASCII string
+- [cast to-base](/reference/cast/to-base): Converts a number of one base to another
+- [cast to-bytes-memory](/reference/cast/to-bytes-memory): Convert hex data to the word-aligned layout of a Solidity `bytes memory` value. The output contains a 32-byte length prefix followed by the data, right-padded with zeros to a whole number of 32-byte words.
+- [cast to-bytes32](/reference/cast/to-bytes32): Right-pads hex data to 32 bytes
+- [cast to-dec](/reference/cast/to-dec): Converts a number of one base to decimal
+- [cast to-fixed-point](/reference/cast/to-fixed-point): Convert an integer into a fixed point number
+- [cast to-hex](/reference/cast/to-hex): Converts a number of one base to another
+- [cast to-hexdata](/reference/cast/to-hexdata): Normalize the input to lowercase, 0x-prefixed hex. The input can be: - mixed case hex with or without 0x prefix - 0x prefixed hex, concatenated with a ':' - an absolute path to file - @tag, where the tag is defined in an environment variable
+- [cast to-int256](/reference/cast/to-int256): Convert a number to a hex-encoded int256
+- [cast to-rlp](/reference/cast/to-rlp): RLP encodes hex data, or an array of hex data. Accepts a hex-encoded string, or an array of hex-encoded strings. Can be arbitrarily recursive. Examples: - `cast to-rlp "[]"` -> `0xc0` - `cast to-rlp "0x22"` -> `0x22` - `cast to-rlp "[\"0x61\"]"` -> `0xc161` - `cast to-rlp "[\"0xf1\", \"f2\"]"` -> `0xc481f181f2`
+- [cast to-uint256](/reference/cast/to-uint256): Convert a number to a hex-encoded uint256
+- [cast to-unit](/reference/cast/to-unit): Convert an ETH amount into another unit (ether, gwei or wei). Examples: - 1ether wei - "1 ether" wei - 1ether - 1 gwei - 1gwei ether
+- [cast to-wei](/reference/cast/to-wei): Convert an ETH amount to wei. Consider using --to-unit.
+- [cast lookup-address](/reference/cast/lookup-address): Perform an ENS reverse lookup
+- [cast namehash](/reference/cast/namehash): Calculate the ENS namehash of a name
+- [cast resolve-name](/reference/cast/resolve-name): Perform an ENS lookup
+- [cast source](/reference/cast/source): Get the source code of a contract from a block explorer
+- [cast completions](/reference/cast/completions): Generate shell completions script
+- [cast access-list](/reference/cast/access-list): Create an access list for a transaction Examples: - cast access-list vitalik.eth --value 0.1ether - cast access-list $TOKEN "transfer(address,uint256)" vitalik.eth 100
+- [cast call](/reference/cast/call): Perform a call on an account without publishing a transaction Examples: - cast call $TOKEN "balanceOf(address)(uint256)" vitalik.eth - cast call $TOKEN "transfer(address,uint256)" vitalik.eth 100 --trace
+- [cast estimate](/reference/cast/estimate): Estimate the gas cost of a transaction Examples: - cast estimate vitalik.eth --value 0.1ether - cast estimate $CONTRACT "deposit()" --value 1ether
+- [cast logs](/reference/cast/logs): Get logs by signature or topic
+- [cast mktx](/reference/cast/mktx): Build and sign a transaction
+- [cast publish](/reference/cast/publish): Publish a raw transaction to the network
+- [cast receipt](/reference/cast/receipt): Get the transaction receipt for a transaction
+- [cast receive-policy receipt](/reference/cast/receive-policy/receipt): Blocked receive-policy receipt utilities
+- [cast rpc](/reference/cast/rpc): Perform a raw JSON-RPC request
+- [cast run](/reference/cast/run): Runs a published transaction in a local environment and prints the trace Examples: - cast run $TX_HASH - cast run $TX_HASH --quick (only use the state from the previous block) - cast run $TX_HASH --debug (open the transaction in the debugger)
+- [cast send](/reference/cast/send): Sign and publish a transaction
+- [cast tx](/reference/cast/tx): Get information about a transaction
+- [cast abi-encode-event](/reference/cast/abi-encode-event): ABI encode an event and its arguments to generate topics and data
+- [cast address-zero](/reference/cast/address-zero): Prints the zero address
+- [cast admin](/reference/cast/admin): Fetch the EIP-1967 admin account
+- [cast artifact](/reference/cast/artifact): Generate an artifact file, that can be used to deploy a contract locally
+- [cast b2e-payload](/reference/cast/b2e-payload): Convert Beacon payload to execution payload
+- [cast base-fee](/reference/cast/base-fee): Get the basefee of a block
+- [cast batch-mktx](/reference/cast/batch-mktx): Build and sign a batch transaction (Tempo)
+- [cast batch-send](/reference/cast/batch-send): Sign and publish a batch transaction (Tempo)
+- [cast bind](/reference/cast/bind): Generate a rust binding from a given ABI
+- [cast call --create](/reference/cast/call/--create): ignores the address field and simulates creating a contract
+- [cast channel-id](/reference/cast/channel-id): Compute a Tempo TIP-20 channel reserve channel ID
+- [cast classify](/reference/cast/classify): Classify a raw transaction as Tempo T5 payment/general lane
+- [cast codehash](/reference/cast/codehash): Get the codehash for an account
+- [cast compute-address](/reference/cast/compute-address): Compute the contract address from a given nonce and deployer address
+- [cast concat-hex](/reference/cast/concat-hex): Concatenate hex strings
+- [cast constructor-args](/reference/cast/constructor-args): Display constructor arguments used for the contract initialization
+- [cast create2](/reference/cast/create2): Generate a deterministic contract address using CREATE2
+- [cast creation-code](/reference/cast/creation-code): Download a contract creation code from Etherscan and RPC
+- [cast decode-error](/reference/cast/decode-error): Decode custom error data
+- [cast decode-event](/reference/cast/decode-event): Decode event data
+- [cast decode-string](/reference/cast/decode-string): Decode ABI-encoded string. Similar to `calldata-decode --input`, but the function argument is a `string`
+- [cast decode-transaction](/reference/cast/decode-transaction): Decodes a raw signed EIP 2718 typed transaction
+- [cast disassemble](/reference/cast/disassemble): Disassembles a hex-encoded bytecode into a human-readable representation
+- [cast erc20-token](/reference/cast/erc20-token): ERC20 token operations
+- [cast erc20-token allowance](/reference/cast/erc20-token/allowance): Query ERC20 token allowance
+- [cast erc20-token approve](/reference/cast/erc20-token/approve): Approve ERC20 token spending
+- [cast erc20-token burn](/reference/cast/erc20-token/burn): Burn ERC20 tokens
+- [cast erc20-token decimals](/reference/cast/erc20-token/decimals): Query ERC20 token decimals
+- [cast erc20-token mint](/reference/cast/erc20-token/mint): Mint ERC20 tokens (if the token supports minting)
+- [cast erc20-token name](/reference/cast/erc20-token/name): Query ERC20 token name
+- [cast erc20-token symbol](/reference/cast/erc20-token/symbol): Query ERC20 token symbol
+- [cast erc20-token total-supply](/reference/cast/erc20-token/total-supply): Query ERC20 token total supply
+- [cast erc20-token transfer](/reference/cast/erc20-token/transfer): Transfer ERC20 tokens
+- [cast estimate --create](/reference/cast/estimate/--create): Estimate gas cost to deploy a smart contract
+- [cast format-units](/reference/cast/format-units): Format a number from smallest unit to decimal with arbitrary decimals. Examples: - 1000000 6 (for USDC, result: 1.0) - 2500000000000 12 (for 12 decimals, result: 2.5) - 1230 3 (for 3 decimals, result: 1.23)
+- [cast hash-message](/reference/cast/hash-message): Hash a message according to EIP-191
+- [cast hash-zero](/reference/cast/hash-zero): Prints the zero hash
+- [cast implementation](/reference/cast/implementation): Fetch the EIP-1967 implementation for a contract Can read from the implementation slot or the beacon slot
+- [cast index-erc7201](/reference/cast/index-erc7201): Compute storage slots as specified by `ERC-7201: Namespaced Storage Layout`
+- [cast interface](/reference/cast/interface): Generate a Solidity interface from a given ABI. Currently does not support ABI encoder v2.
+- [cast keccak](/reference/cast/keccak): Hash arbitrary data using Keccak-256
+- [cast key-authorization](/reference/cast/key-authorization): Tempo key authorization RLP helpers
+- [cast key-authorization encode](/reference/cast/key-authorization/encode): RLP-encode an unsigned Tempo key authorization
+- [cast key-authorization inspect](/reference/cast/key-authorization/inspect): Decode and inspect a Tempo key authorization (signed or unsigned). Accepts the hex RLP from `encode` (unsigned) or `sign` (signed) and prints its fields, including the T6 `is_admin`/`account` fields and the recovered signer for signed input.
+- [cast key-authorization sign](/reference/cast/key-authorization/sign): Sign and RLP-encode a Tempo key authorization. With an admin access-key signer the bound account is the key's root and is derived automatically; with a direct signer, `--bind-account` binds to another root. A root-signed `--admin` authorization defaults the account to the signer.
+- [cast keychain](/reference/cast/keychain): Tempo keychain (access key) management
+- [cast keychain authorize](/reference/cast/keychain/authorize): Authorize a new key on-chain via the AccountKeychain precompile
+- [cast keychain burn-witness](/reference/cast/keychain/burn-witness): Burn a TIP-1053 key-authorization witness for the signing account
+- [cast keychain check](/reference/cast/keychain/check): Check on-chain provisioning status of a key via the AccountKeychain precompile
+- [cast keychain doctor](/reference/cast/keychain/doctor): Diagnose access-key signing issues end-to-end. Walks the local registry, RPC, and on-chain key state and prints a green checklist. The first failing step turns red and includes a one-line hint.
+- [cast keychain inspect](/reference/cast/keychain/inspect): Inspect an access key policy using the local key registry and on-chain state
+- [cast keychain is-admin](/reference/cast/keychain/is-admin): Check whether a key is the root key or an active admin key for an account (T6)
+- [cast keychain is-witness-burned](/reference/cast/keychain/is-witness-burned): Check whether a TIP-1053 key-authorization witness has been burned
+- [cast keychain list](/reference/cast/keychain/list): List all keys from the local keys.toml file
+- [cast keychain policy](/reference/cast/keychain/policy): Read or edit TIP-1011 access-key permissions
+- [cast keychain policy add-call](/reference/cast/keychain/policy/add-call): Add or widen an allowed call rule for a target contract
+- [cast keychain policy remove-target](/reference/cast/keychain/policy/remove-target): Remove all allowed-call rules for a target contract
+- [cast keychain policy set-limit](/reference/cast/keychain/policy/set-limit): Update a token spending limit amount for a key
+- [cast keychain revoke](/reference/cast/keychain/revoke): Revoke an authorized key on-chain via the AccountKeychain precompile
+- [cast keychain rl](/reference/cast/keychain/rl): Query the remaining spending limit for a key on a specific token
+- [cast keychain rs](/reference/cast/keychain/rs): Remove call scope for a key on a target
+- [cast keychain show](/reference/cast/keychain/show): Show all keys for a specific wallet address from the local keys.toml file
+- [cast keychain ss](/reference/cast/keychain/ss): Set allowed call scopes for a key
+- [cast keychain ul](/reference/cast/keychain/ul): Update the spending limit for a key on a specific token
+- [cast keychain verify](/reference/cast/keychain/verify): Verify a Tempo keychain signature against an account's active access key (T6). `signature` must be an encoded Tempo keychain signature (not a raw 65-byte secp256k1 signature). Returns true only for an active access key, never the root key. The supplied `hash` should already be domain-separated by the caller.
+- [cast keychain verify-admin](/reference/cast/keychain/verify-admin): Verify a Tempo keychain signature against an account's root or admin key (T6). `signature` must be an encoded Tempo keychain signature (not a raw 65-byte secp256k1 signature). Returns true for the root key or an active admin key. `hash` should already be domain-separated by the caller.
+- [cast max-int](/reference/cast/max-int): Prints the maximum value of the given integer type
+- [cast max-uint](/reference/cast/max-uint): Prints the maximum value of the given integer type
+- [cast min-int](/reference/cast/min-int): Prints the minimum value of the given integer type
+- [cast mktx --create](/reference/cast/mktx/--create): Use to deploy raw contract bytecode
+- [cast pad](/reference/cast/pad): Pads hex data to a specified length
+- [cast parse-units](/reference/cast/parse-units): Convert a number from decimal to smallest unit with arbitrary decimals. Examples: - 1.0 6 (for USDC, result: 1000000) - 2.5 12 (for 12 decimals token, result: 2500000000000) - 1.23 3 (for 3 decimals token, result: 1230)
+- [cast receive-policy](/reference/cast/receive-policy): Account-level receive policy operations (Tempo)
+- [cast receive-policy claim](/reference/cast/receive-policy/claim): Claim held TIP-20 funds using a blocked receive-policy receipt
+- [cast receive-policy get](/reference/cast/receive-policy/get): Get an account's configured receive policy
+- [cast receive-policy receipt burn](/reference/cast/receive-policy/receipt/burn): Burn held funds for a blocked receipt when authorized by the token
+- [cast receive-policy receipt decode](/reference/cast/receive-policy/receipt/decode): Decode an ABI-encoded ReceivePolicyGuard claim receipt
+- [cast receive-policy set](/reference/cast/receive-policy/set): Set the caller's TIP-403 receive policy. Create the sender and token-filter policies referenced here with `cast tip403 create`.
+- [cast receive-policy validate](/reference/cast/receive-policy/validate): Validate whether an inbound TIP-20 transfer or mint would be credited or held
+- [cast recover-authority](/reference/cast/recover-authority): Recovery an EIP-7702 authority from a Authorization JSON string
+- [cast send --create](/reference/cast/send/--create): Use to deploy raw contract bytecode
+- [cast sig](/reference/cast/sig): Get the selector for a function
+- [cast sig-event](/reference/cast/sig-event): Generate event signatures from event string
+- [cast storage-credits](/reference/cast/storage-credits): T7 storage credits operations (Tempo)
+- [cast storage-credits budget](/reference/cast/storage-credits/budget): Show an account's storage credit spend budget. Budget is transaction-local transient state, so a standalone read reflects the default rather than a value set by an earlier `set-budget` transaction.
+- [cast storage-credits mode](/reference/cast/storage-credits/mode): Show an account's storage credit consumption mode. Mode is transaction-local transient state, so a standalone read reflects the default rather than a value set by an earlier `set-mode` transaction.
+- [cast storage-credits set-budget](/reference/cast/storage-credits/set-budget): Set the caller's storage credit spend budget, which also selects `direct` mode. The budget only applies within the transaction that sets it; batch it with the storage operations it should govern.
+- [cast storage-credits set-mode](/reference/cast/storage-credits/set-mode): Set the caller's storage credit consumption mode. The mode only applies within the transaction that sets it; batch it with the storage operations it should govern.
+- [cast storage-root](/reference/cast/storage-root): Get the storage root for an account
+- [cast tempo](/reference/cast/tempo): Tempo wallet integration (login, etc.)
+- [cast tempo login](/reference/cast/tempo/login): Authorize a new access key against your Tempo wallet via wallet.tempo. Persists the key to `$TEMPO_HOME/wallet/keys.toml` (default `~/.tempo/wallet/keys.toml`). Also runs automatically on a 402 from a Tempo RPC when no local key is configured. Env: `TEMPO_HOME`, `TEMPO_CLI_AUTH_URL` (override auth service).
+- [cast tip20-token](/reference/cast/tip20-token): TIP-20 token operations (Tempo)
+- [cast tip20-token create](/reference/cast/tip20-token/create): Create a new TIP-20 token via the TIP20Factory
+- [cast tip20-token logo-check](/reference/cast/tip20-token/logo-check): Validate a TIP-20 logo URI offline against Tempo T5 constraints
+- [cast tip20-token logo-set](/reference/cast/tip20-token/logo-set): Update a TIP-20 token logo URI
+- [cast tip20-token mine](/reference/cast/tip20-token/mine): Mine a TIP-1022 salt for virtual address' master registration on Tempo
+- [cast tip403](/reference/cast/tip403): TIP-403 policy registry operations (Tempo)
+- [cast tip403 blacklist](/reference/cast/tip403/blacklist): Add or remove an account from a blacklist policy
+- [cast tip403 check](/reference/cast/tip403/check): Check whether an address is authorized by a policy
+- [cast tip403 create](/reference/cast/tip403/create): Create a new simple (whitelist or blacklist) policy
+- [cast tip403 info](/reference/cast/tip403/info): Show a policy's type and admin
+- [cast tip403 whitelist](/reference/cast/tip403/whitelist): Add or remove an account from a whitelist policy
+- [cast to-check-sum-address](/reference/cast/to-check-sum-address): Convert an address to a checksummed format (EIP-55)
+- [cast to-utf8](/reference/cast/to-utf8): Convert hex data to a utf-8 string
+- [cast trace](/reference/cast/trace): CLI arguments for `cast trace`
+- [cast tx-pool](/reference/cast/tx-pool): Inspect the TxPool of a node
+- [cast tx-pool content](/reference/cast/tx-pool/content): Fetches the content of the transaction pool
+- [cast tx-pool content-from](/reference/cast/tx-pool/content-from): Fetches the content of the transaction pool filtered by a specific address
+- [cast tx-pool inspect](/reference/cast/tx-pool/inspect): Fetches a textual summary of each transaction in the pool
+- [cast tx-pool status](/reference/cast/tx-pool/status): Fetches the current status of the transaction pool
+- [cast virtual-address](/reference/cast/virtual-address): TIP-1022 virtual address registry operations (Tempo)
+- [cast virtual-address create](/reference/cast/virtual-address/create): Mine a TIP-1022 proof-of-work salt, register as a virtual address master, and print derived virtual addresses for the given owner
+- [cast virtual-address resolve](/reference/cast/virtual-address/resolve): Resolve a virtual address to its registered master and decode its components
+- [cast virtual-address watch](/reference/cast/virtual-address/watch): Watch (tail) incoming TIP-20 transfers to a virtual address
+- [cast wallet address](/reference/cast/wallet/address): Convert a private key to an address
+- [cast wallet change-password](/reference/cast/wallet/change-password): Change the password of a keystore file
+- [cast wallet decrypt-keystore](/reference/cast/wallet/decrypt-keystore): Decrypt a keystore file to get the private key
+- [cast wallet derive](/reference/cast/wallet/derive): Derive accounts from a mnemonic
+- [cast wallet import](/reference/cast/wallet/import): Import a private key into an encrypted keystore
+- [cast wallet list](/reference/cast/wallet/list): List all the accounts in the keystore default directory
+- [cast wallet new](/reference/cast/wallet/new): Create a new random keypair
+- [cast wallet new-mnemonic](/reference/cast/wallet/new-mnemonic): Generates a random BIP39 mnemonic phrase
+- [cast wallet private-key](/reference/cast/wallet/private-key): Derives private key from mnemonic
+- [cast wallet public-key](/reference/cast/wallet/public-key): Get the public key for the given private key
+- [cast wallet remove](/reference/cast/wallet/remove): Remove a wallet from the keystore. This command requires the wallet alias and will prompt for a password to ensure that only an authorized user can remove the wallet.
+- [cast wallet session](/reference/cast/wallet/session): Manage temporary Tempo wallet sessions
+- [cast wallet session create](/reference/cast/wallet/session/create): Create a temporary Tempo session and persist it locally
+- [cast wallet session revoke](/reference/cast/wallet/session/revoke): Revoke a Tempo session key on-chain when provisioned, then clear local key material
+- [cast wallet sign](/reference/cast/wallet/sign): Sign a message or typed data Examples: - cast wallet sign "hello" --account dev - cast wallet sign "hello" --private-key $PK - cast wallet sign --data --from-file typed_data.json --ledger
+- [cast wallet sign-auth](/reference/cast/wallet/sign-auth): EIP-7702 sign authorization
+- [cast wallet vanity](/reference/cast/wallet/vanity): Generate a vanity address
+- [cast wallet verify](/reference/cast/wallet/verify): Verify the signature of a message
+- [cast wallet](/reference/cast/wallet): Wallet management utilities
+- [anvil](/reference/anvil/anvil): A fast local Ethereum development node
+- [anvil completions](/reference/anvil/completions): Generate shell completions script
+- [chisel](/reference/chisel/chisel): Fast, utilitarian, and verbose Solidity REPL
+- [chisel clear-cache](/reference/chisel/clear-cache): Clear all cached chisel sessions from the cache directory
+- [chisel eval](/reference/chisel/eval): Simple evaluation of a command without entering the REPL
+- [chisel list](/reference/chisel/list): List all cached sessions
+- [chisel load](/reference/chisel/load): Load a cached session
+- [chisel view](/reference/chisel/view): View the source of a cached session
+- [Cheatcodes Reference](/reference/cheatcodes/overview)
+- [warp](/reference/cheatcodes/warp): Sets block.timestamp to a specified value in Forge tests
+- [roll](/reference/cheatcodes/roll): Sets block.number to a specified value in Forge tests
+- [setBlockhash](/reference/cheatcodes/set-blockhash): Sets the blockhash for a recent block
+- [fee](/reference/cheatcodes/fee): Sets block.basefee to a specified value in Forge tests
+- [getBlockTimestamp](/reference/cheatcodes/get-block-timestamp): Gets the current block.timestamp, avoiding IR compilation optimization issues
+- [getBlockNumber](/reference/cheatcodes/get-block-number): Gets the current block.number, avoiding IR compilation optimization issues
+- [difficulty](/reference/cheatcodes/difficulty): Sets block.difficulty for pre-merge EVM versions in Forge tests
+- [prevrandao](/reference/cheatcodes/prevrandao): Sets block.prevrandao for post-merge EVM versions in Forge tests
+- [chainId](/reference/cheatcodes/chain-id): Sets block.chainid to a specified value in Forge tests
+- [getChainId](/reference/cheatcodes/get-chain-id): Gets the current block.chainid of the selected environment
+- [store](/reference/cheatcodes/store): Stores a value in a specific storage slot of an account
+- [setTip20LogoURI](/reference/cheatcodes/set-tip20-logo-uri): Sets a TIP-20 token logo URI directly in storage
+- [load](/reference/cheatcodes/load): Loads a value from a specific storage slot of an account
+- [etch](/reference/cheatcodes/etch): Sets the bytecode of an address to custom code
+- [cloneAccount](/reference/cheatcodes/clone-account): Clones an account's code, storage, balance, and nonce to another address
+- [dumpState](/reference/cheatcodes/dump-state): Writes the current EVM state to a JSON file in genesis alloc format
+- [loadAllocs](/reference/cheatcodes/load-allocs): Loads a genesis alloc JSON file into the in-memory EVM state
+- [deal](/reference/cheatcodes/deal): Sets the ETH balance of an address
+- [prank](/reference/cheatcodes/prank): Sets msg.sender for the next call to a specified address
+- [startPrank](/reference/cheatcodes/start-prank): Sets msg.sender for all subsequent calls until stopPrank is called
+- [stopPrank](/reference/cheatcodes/stop-prank): Stops an active prank, resetting msg.sender and tx.origin
+- [readCallers](/reference/cheatcodes/read-callers): Reads the current caller mode, msg.sender, and tx.origin
+- [record](/reference/cheatcodes/record): Starts recording all storage reads and writes
+- [accesses](/reference/cheatcodes/accesses): Gets all storage slots that have been read or written to on an address
+- [Mapping recording](/reference/cheatcodes/mapping-recording): Records mapping writes to discover mapping keys and slots
+- [recordLogs](/reference/cheatcodes/record-logs): Starts recording all emitted events
+- [getRecordedLogs](/reference/cheatcodes/get-recorded-logs): Gets emitted events recorded by recordLogs as Solidity structs or JSON
+- [Debug trace recording](/reference/cheatcodes/debug-trace-recording): Records opcode-level debug steps for a selected section of execution
+- [setNonce](/reference/cheatcodes/set-nonce): Sets the nonce of an account
+- [getNonce](/reference/cheatcodes/get-nonce): Gets the nonce of an account or wallet
+- [mockCall](/reference/cheatcodes/mock-call): Mocks calls to an address with specific calldata to return specified data
+- [mockCalls](/reference/cheatcodes/mock-calls): Mocks calls to return different data for each successive invocation
+- [mockCallRevert](/reference/cheatcodes/mock-call-revert): Mocks calls to an address to revert with specified data
+- [mockFunction](/reference/cheatcodes/mock-function): Executes calls to an address using bytecode from another address
+- [clearMockedCalls](/reference/cheatcodes/clear-mocked-calls): Clears all mocked calls
+- [coinbase](/reference/cheatcodes/coinbase): Sets block.coinbase to a specified address
+- [broadcast](/reference/cheatcodes/broadcast): Makes the next call create a transaction that can be signed and sent onchain
+- [startBroadcast](/reference/cheatcodes/start-broadcast): Makes all subsequent calls create transactions that can be signed and sent onchain
+- [stopBroadcast](/reference/cheatcodes/stop-broadcast): Stops collecting transactions for onchain broadcasting
+- [broadcastRawTransaction](/reference/cheatcodes/broadcast-raw-transaction): Executes a signed raw transaction and broadcasts it to the network during scripts
+- [pauseGasMetering](/reference/cheatcodes/pause-gas-metering): Pauses gas metering so gasleft() does not decrease
+- [resetGasMetering](/reference/cheatcodes/reset-gas-metering): Resets gas metering to the gas limit of the current execution frame
+- [resumeGasMetering](/reference/cheatcodes/resume-gas-metering): Resumes gas metering after it was paused
+- [lastFrameGas](/reference/cheatcodes/last-frame-gas): Returns gas measurements for the last external call or contract creation
+- [txGasPrice](/reference/cheatcodes/tx-gas-price): Sets tx.gasprice for the rest of the transaction
+- [executeTransaction](/reference/cheatcodes/execute-transaction): Executes a signed raw transaction with isolated transaction semantics
+- [startStateDiffRecording](/reference/cheatcodes/start-state-diff-recording): Starts recording all state changes during execution
+- [stopAndReturnStateDiff](/reference/cheatcodes/stop-and-return-state-diff): Stops state diff recording and returns all recorded state changes
+- [State diff queries](/reference/cheatcodes/get-state-diff): Reads recorded state changes as text, JSON, or flattened storage accesses
+- [getStorageSlots](/reference/cheatcodes/get-storage-slots): Returns the physical storage slots occupied by a named state variable
+- [snapshotState cheatcodes](/reference/cheatcodes/state-snapshots): Snapshot and restore EVM state
+- [snapshotGas cheatcodes](/reference/cheatcodes/gas-snapshots): Capture and compare gas usage across test runs
+- [isImplicitlyApproved](/reference/cheatcodes/is-implicitly-approved): Checks whether a spender is implicitly approved on Tempo
+- [isContext](/reference/cheatcodes/is-context): Checks the current Forge execution context
+- [isIsolateMode](/reference/cheatcodes/is-isolate-mode): Checks whether isolated test execution is enabled
+- [expectRevert](/reference/cheatcodes/expect-revert): Asserts that the next call reverts with optional message matching
+- [expectEmit](/reference/cheatcodes/expect-emit): Asserts that specific events are emitted during the next call
+- [expectEmitAnonymous](/reference/cheatcodes/expect-emit-anonymous): Asserts that a specific anonymous event is emitted during the next call
+- [expectCall](/reference/cheatcodes/expect-call): Asserts that a specific call is made during test execution
+- [expectSafeMemory](/reference/cheatcodes/expect-safe-memory): Restricts memory access to explicitly allowed ranges in the current or next call context
+- [expectKeychainVerified](/reference/cheatcodes/expect-keychain-verified): Asserts that a SignatureVerifier.verifyKeychain call is made
+- [expectKeychainAdminVerified](/reference/cheatcodes/expect-keychain-admin-verified): Asserts that a SignatureVerifier.verifyKeychainAdmin call is made
+- [expectTip20LogoURIUpdated](/reference/cheatcodes/expect-tip20-logo-uri-updated): Expects a TIP-20 LogoURIUpdated event
+- [assume](/reference/cheatcodes/assume): Discards fuzz inputs that don't satisfy a condition
+- [assumeNoRevert](/reference/cheatcodes/assume-no-revert): Discards fuzz inputs if the next call reverts
+- [assumeImplicitApproval](/reference/cheatcodes/assume-implicit-approval): Skips fuzz inputs unless a spender is implicitly approved on Tempo
+- [bound](/reference/cheatcodes/bound): Returns a new random value inside a range, different from the current value
+- [createFork](/reference/cheatcodes/create-fork): Creates a new fork from an RPC endpoint
+- [selectFork](/reference/cheatcodes/select-fork): Activates a previously created fork
+- [createSelectFork](/reference/cheatcodes/create-select-fork): Creates and activates a new fork in one call
+- [activeFork](/reference/cheatcodes/active-fork): Returns the identifier of the currently active fork
+- [rollFork](/reference/cheatcodes/roll-fork): Sets the block number of a fork
+- [makePersistent](/reference/cheatcodes/make-persistent): Marks accounts as persistent across fork switches
+- [revokePersistent](/reference/cheatcodes/revoke-persistent): Removes persistent status from accounts
+- [isPersistent](/reference/cheatcodes/is-persistent): Checks if an account is marked as persistent across forks
+- [allowCheatcodes](/reference/cheatcodes/allow-cheatcodes): Grants cheatcode access to an address in forking mode
+- [transact](/reference/cheatcodes/transact): Fetches and executes a transaction from a fork
+- [ffi](/reference/cheatcodes/ffi): Calls an arbitrary external command
+- [prompt](/reference/cheatcodes/prompt): Displays an interactive prompt for user input in scripts
+- [projectRoot](/reference/cheatcodes/project-root): Returns the root directory of the current Foundry project
+- [getCode](/reference/cheatcodes/get-code): Returns the creation bytecode for a contract in the project
+- [getDeployedCode](/reference/cheatcodes/get-deployed-code): Returns the deployed (runtime) bytecode for a contract in the project
+- [deployCode](/reference/cheatcodes/deploy-code): Deploys a contract from a compiled artifact, optionally with constructor args, value, and CREATE2 salt
+- [getSelectors](/reference/cheatcodes/get-selectors): Returns the function selectors declared in a compiled contract artifact
+- [sleep](/reference/cheatcodes/sleep): Pauses execution for a specified duration
+- [unixTime](/reference/cheatcodes/unix-time): Returns the current unix timestamp in milliseconds
+- [setEnv](/reference/cheatcodes/set-env): Sets an environment variable
+- [envOr](/reference/cheatcodes/env-or): Reads an environment variable with a default fallback value
+- [envBool](/reference/cheatcodes/env-bool): Reads an environment variable as bool or bool[]
+- [envUint](/reference/cheatcodes/env-uint): Reads an environment variable as uint256 or uint256[]
+- [envInt](/reference/cheatcodes/env-int): Reads an environment variable as int256 or int256[]
+- [envAddress](/reference/cheatcodes/env-address): Reads an environment variable as address or address[]
+- [envBytes32](/reference/cheatcodes/env-bytes32): Reads an environment variable as bytes32 or bytes32[]
+- [envString](/reference/cheatcodes/env-string): Reads an environment variable as string or string[]
+- [envBytes](/reference/cheatcodes/env-bytes): Reads an environment variable as bytes or bytes[]
+- [keyExists](/reference/cheatcodes/key-exists): Checks if a key exists in a JSON string (deprecated)
+- [keyExistsJson](/reference/cheatcodes/key-exists-json): Checks if a key exists in a JSON string
+- [keyExistsToml](/reference/cheatcodes/key-exists-toml): Checks if a key exists in a TOML table
+- [parseJson](/reference/cheatcodes/parse-json): Parses JSON files and returns values as ABI-encoded bytes
+- [parseJsonArrayLength](/reference/cheatcodes/parse-json-array-length): Returns the length of an array selected from JSON data
+- [parseToml](/reference/cheatcodes/parse-toml): Parses TOML files and returns values as ABI-encoded bytes
+- [parseJsonKeys](/reference/cheatcodes/parse-json-keys): Gets list of keys present in a JSON string
+- [parseJsonType](/reference/cheatcodes/parse-json-type): Parses JSON and coerces it to a described Solidity type in field order
+- [parseJsonTypeArray](/reference/cheatcodes/parse-json-type-array): Parses a JSON array and coerces its elements to a described Solidity type
+- [parseTomlKeys](/reference/cheatcodes/parse-toml-keys): Gets list of keys present in a TOML string
+- [serializeJson](/reference/cheatcodes/serialize-json): Serializes values as a stringified JSON object
+- [serializeJsonType](/reference/cheatcodes/serialize-json-type): Serializes an ABI-encoded value to JSON using a type description
+- [writeJson](/reference/cheatcodes/write-json): Writes a serialized JSON object to a file
+- [writeToml](/reference/cheatcodes/write-toml): Writes a serialized JSON object to a TOML file
+- [sign](/reference/cheatcodes/sign): Signs a digest with a private key, returning (v, r, s)
+- [signCompact](/reference/cheatcodes/sign-compact): Signs a digest, returning an EIP-2098 compact signature (r, vs)
+- [Ed25519](/reference/cheatcodes/ed25519): Creates Ed25519 keys and signs or verifies namespaced messages
+- [P256](/reference/cheatcodes/p256): Signs digests and derives public keys on the secp256r1 (P-256) curve
+- [secp256k1 arithmetic](/reference/cheatcodes/ec-arithmetic): Adds and multiplies secp256k1 points in affine or projective coordinates
+- [signDelegation](/reference/cheatcodes/sign-delegation): Signs and attaches EIP-7702 authorization for account delegation
+- [signKeychain](/reference/cheatcodes/sign-keychain): Signs a digest as a Tempo keychain signature using an access key
+- [signKeychainAdmin](/reference/cheatcodes/sign-keychain-admin): Signs a digest as a Tempo keychain signature using a root or admin key
+- [addr](/reference/cheatcodes/addr): Computes the address for a given private key
+- [computeCreateAddress](/reference/cheatcodes/compute-create-address): Computes the address where a contract will be deployed via CREATE for a deployer and nonce
+- [computeCreate2Address](/reference/cheatcodes/compute-create2-address): Computes the address where a contract will be deployed via CREATE2 for a salt and init code hash
+- [skip](/reference/cheatcodes/skip): Marks a test as skipped conditionally
+- [label](/reference/cheatcodes/label): Sets a label for an address in test traces
+- [getLabel](/reference/cheatcodes/get-label): Retrieves the label for an address
+- [deriveKey](/reference/cheatcodes/derive-key): Derives a private key from a mnemonic phrase
+- [parseBytes](/reference/cheatcodes/parse-bytes): Parses a hex string into bytes
+- [parseAddress](/reference/cheatcodes/parse-address): Parses a hex string into an address
+- [parseUint](/reference/cheatcodes/parse-uint): Parses a string into a uint256
+- [parseInt](/reference/cheatcodes/parse-int): Parses a string into an int256
+- [parseBytes32](/reference/cheatcodes/parse-bytes32): Parses a hex string into bytes32
+- [parseBool](/reference/cheatcodes/parse-bool): Parses a string into a bool
+- [rememberKey](/reference/cheatcodes/remember-key): Stores a private key in forge's local wallet for broadcasting
+- [toString](/reference/cheatcodes/to-string): Converts any type to its string representation
+- [breakpoint](/reference/cheatcodes/breakpoint): Places a breakpoint for the debugger
+- [createWallet](/reference/cheatcodes/create-wallet): Creates a new Wallet struct with address and keys
+- [getWallets](/reference/cheatcodes/get-wallets): Returns the addresses of available unlocked wallets in the script environment
+- [copyStorage](/reference/cheatcodes/copy-storage): Copies storage from one contract to another
+- [setArbitraryStorage](/reference/cheatcodes/set-arbitrary-storage): Makes the storage of an address fully symbolic
+- [randomUint](/reference/cheatcodes/random-uint): Returns a random uint256 value, optionally within a range or bit width
+- [randomInt](/reference/cheatcodes/random-int): Returns a random int256 value, optionally of a given bit width
+- [randomAddress](/reference/cheatcodes/random-address): Returns a random address
+- [randomBool](/reference/cheatcodes/random-bool): Returns a random boolean
+- [randomBytes](/reference/cheatcodes/random-bytes): Returns random byte arrays of dynamic or fixed length
+- [setSeed](/reference/cheatcodes/set-seed): Sets the seed of Foundry's internal RNG for deterministic random values
+- [ensNamehash](/reference/cheatcodes/ens-namehash): Returns the ENS namehash of a name
+- [foundryVersion cheatcodes](/reference/cheatcodes/foundry-version): Reads and compares the Foundry version running the tests
+- [eip712HashType](/reference/cheatcodes/eip712-hash-type): Generates the EIP-712 type hash for a struct type
+- [eip712HashStruct](/reference/cheatcodes/eip712-hash-struct): Generates the EIP-712 struct hash for a type and its ABI-encoded data
+- [eip712HashTypedData](/reference/cheatcodes/eip712-hash-typed-data): Generates a ready-to-sign EIP-712 digest from JSON typed data
+- [String Cheatcodes](/reference/cheatcodes/strings): String helpers for searching, splitting, replacing, trimming, and case conversion
+- [toBase64](/reference/cheatcodes/to-base64): Encodes bytes or strings to base64 and base64url
+- [RPC Cheatcodes](/reference/cheatcodes/rpc): Access configured RPC endpoints and make JSON-RPC calls
+- [getChain](/reference/cheatcodes/get-chain): Returns chain metadata for a known chain alias or chain ID
+- [File Cheatcodes](/reference/cheatcodes/fs): File system operations for reading, writing, and managing files
+- [Forge Standard Library Reference](/reference/forge-std/overview)
+- [Std Logs](/reference/forge-std/std-logs)
+- [Std Assertions](/reference/forge-std/std-assertions)
+- [fail](/reference/forge-std/fail)
+- [assertTrue](/reference/forge-std/assertTrue)
+- [assertFalse](/reference/forge-std/assertFalse)
+- [assertEq](/reference/forge-std/assertEq)
+- [assertEqDecimal](/reference/forge-std/assertEqDecimal)
+- [assertNotEq](/reference/forge-std/assertNotEq)
+- [assertNotEqDecimal](/reference/forge-std/assertNotEqDecimal)
+- [assertLt](/reference/forge-std/assertLt)
+- [assertLtDecimal](/reference/forge-std/assertLtDecimal)
+- [assertGt](/reference/forge-std/assertGt)
+- [assertGtDecimal](/reference/forge-std/assertGtDecimal)
+- [assertLe](/reference/forge-std/assertLe)
+- [assertLeDecimal](/reference/forge-std/assertLeDecimal)
+- [assertGe](/reference/forge-std/assertGe)
+- [assertGeDecimal](/reference/forge-std/assertGeDecimal)
+- [assertApproxEqAbs](/reference/forge-std/assertApproxEqAbs)
+- [assertApproxEqAbsDecimal](/reference/forge-std/assertApproxEqAbsDecimal)
+- [assertApproxEqRel](/reference/forge-std/assertApproxEqRel)
+- [assertApproxEqRelDecimal](/reference/forge-std/assertApproxEqRelDecimal)
+- [Std Cheats](/reference/forge-std/std-cheats)
+- [skip](/reference/forge-std/skip)
+- [rewind](/reference/forge-std/rewind)
+- [hoax](/reference/forge-std/hoax)
+- [startHoax](/reference/forge-std/startHoax)
+- [deal](/reference/forge-std/deal)
+- [deployCode](/reference/forge-std/deployCode)
+- [deployCodeTo](/reference/forge-std/deployCodeTo)
+- [bound](/reference/forge-std/bound)
+- [changePrank](/reference/forge-std/change-prank)
+- [makeAddr](/reference/forge-std/make-addr)
+- [makeAddrAndKey](/reference/forge-std/make-addr-and-key)
+- [noGasMetering](/reference/forge-std/noGasMetering)
+- [assumeNotPrecompile](/reference/forge-std/assume-no-precompiles)
+- [assumePayable](/reference/forge-std/assume-payable)
+- [StdConfig](/reference/forge-std/std-config)
+- [Std Errors](/reference/forge-std/std-errors)
+- [assertionError](/reference/forge-std/assertionError)
+- [arithmeticError](/reference/forge-std/arithmeticError)
+- [divisionError](/reference/forge-std/divisionError)
+- [enumConversionError](/reference/forge-std/enumConversionError)
+- [encodeStorageError](/reference/forge-std/encodeStorageError)
+- [popError](/reference/forge-std/popError)
+- [indexOOBError](/reference/forge-std/indexOOBError)
+- [memOverflowError](/reference/forge-std/memOverflowError)
+- [zeroVarError](/reference/forge-std/zeroVarError)
+- [Std Storage](/reference/forge-std/std-storage)
+- [target](/reference/forge-std/target)
+- [sig](/reference/forge-std/sig)
+- [with_key](/reference/forge-std/with_key)
+- [depth](/reference/forge-std/depth)
+- [enable_packed_slots](/reference/forge-std/enable_packed_slots)
+- [checked_write](/reference/forge-std/checked_write)
+- [find](/reference/forge-std/find)
+- [read](/reference/forge-std/read)
+- [Std Math](/reference/forge-std/std-math)
+- [abs](/reference/forge-std/abs)
+- [delta](/reference/forge-std/delta)
+- [percentDelta](/reference/forge-std/percentDelta)
+- [Script Utils](/reference/forge-std/script-utils)
+- [computeCreateAddress](/reference/forge-std/compute-create-address)
+- [deriveRememberKey](/reference/forge-std/derive-remember-key)
+- [Console Logging](/reference/forge-std/console-log)
+- [Config Overview](/config/reference/overview)
+- [Project](/config/reference/project)
+- [Solidity compiler](/config/reference/solidity-compiler)
+- [Testing](/config/reference/testing)
+- [Tracing](/config/reference/tracing)
+- [Advanced Testing](/config/reference/advanced-testing)
+- [Build, Runtime, and RPC](/config/reference/build-and-runtime)
+- [Tool-specific Configuration](/config/reference/tooling)
+- [In-line test configuration](/config/reference/inline-test-config)
+- [Formatter](/config/reference/formatter)
+- [Linter Configuration](/config/reference/linter)
+- [Documentation Generator](/config/reference/doc-generator)
+- [Etherscan](/config/reference/etherscan)
+- [Foundry - Ethereum Development Framework](/index)
+- [Benchmarks](/benchmarks)
+- [Changelog](/changelog/)
+- [Reference](/reference/): Find exact CLI, cheatcode, Forge Std, and configuration reference documentation for Foundry.
+- [cast index](/reference/cast/): Compute the storage slot for an entry in a mapping
+- [CLI reference versions](/reference/versions): Exact Foundry binary versions used to generate the CLI command reference.
+- [Default foundry configuration](/config/reference/default-config)
+- [Config Reference](/config/reference/README)
+- [cast da-estimate](/reference/cast/da-estimate)
+- [cast index](/reference/cast/index-cmd)
+- [Base Options](/reference/common/base-options)
+- [Create Option](/reference/common/cast-estimate-create-option)
+- [Display Options](/reference/common/display-options)
+- [Etherscan Options](/reference/common/etherscan-options)
+- [Wallet Options - Raw](/reference/common/multi-wallet-options)
+- [Wallet Options - Hardware Wallet](/reference/common/multi-wallet-options-hardware)
+- [Wallet Options - Keystore](/reference/common/multi-wallet-options-keystore)
+- [Wallet Options - Raw](/reference/common/multi-wallet-options-raw)
+- [Wallet Options - Remote](/reference/common/multi-wallet-options-remote)
+- [RPC Options](/reference/common/rpc-options)
+- [Transaction Options](/reference/common/transaction-options)
+- [WALLET OPTIONS - RAW:](/reference/common/wallet-options)
+- [Wallet Options - Hardware Wallet](/reference/common/wallet-options-hardware)
+- [Wallet Options - Keystore](/reference/common/wallet-options-keystore)
+- [WALLET OPTIONS - RAW:](/reference/common/wallet-options-raw)
+- [Wallet Options - Remote](/reference/common/wallet-options-remote)
+- [Config](/reference/forge-std/config)
+- [forge generate](/reference/forge/generate)
+- [forge generate test](/reference/forge/generate/test)

@@ -1,0 +1,2 @@
+vendor/** -whitespace
+test/utils/v4hook-testkit/artifacts/** -whitespace

@@ -1,0 +1,14 @@
+forge-std/=vendor/forge-std/src/
+
+@uniswap/v4-core/=vendor/v4-core/
+@uniswap/v4-periphery/=vendor/v4-periphery/
+v4-core/=vendor/v4-core/
+v4-periphery/=vendor/v4-periphery/
+
+@openzeppelin/contracts/=vendor/openzeppelin-contracts/contracts/
+openzeppelin/=vendor/openzeppelin-contracts/contracts/
+
+@chainlink/contracts/=vendor/chainlink-evm/contracts/
+
+permit2/=vendor/permit2/
+solmate/=vendor/solmate/

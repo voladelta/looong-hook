@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "dependencies": {
+    "chainlink-evm": {
+      "repository": "https://github.com/smartcontractkit/chainlink-evm",
+      "revision": "86aa5a1d34b20eda8d18fe6eb0e4882948e545ba",
+      "tag": "contracts-v1.5.0",
+      "scope": "minimal VRF v2.5 direct-funding closure"
+    },
+    "forge-std": {
+      "repository": "https://github.com/foundry-rs/forge-std",
+      "revision": "8bbcf6e3f8f62f419e5429a0bd89331c85c37824"
+    },
+    "openzeppelin-contracts": {
+      "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+      "revision": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079"
+    },
+    "permit2": {
+      "repository": "https://github.com/Uniswap/permit2",
+      "revision": "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219"
+    },
+    "solmate": {
+      "repository": "https://github.com/transmissions11/solmate",
+      "revision": "4b47a19038b798b4a33d9749d25e570443520647"
+    },
+    "v4-core": {
+      "repository": "https://github.com/Uniswap/v4-core",
+      "revision": "a7cf038cd568801a79a9b4cf92cd5b52c95c8585"
+    },
+    "v4-periphery": {
+      "repository": "https://github.com/Uniswap/v4-periphery",
+      "revision": "eeb3eff28dd5f5f17aa94180fa3610ff59b0e1c8"
+    }
+  }
+}

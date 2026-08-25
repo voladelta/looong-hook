@@ -1,0 +1,36 @@
+# Compiler files
+cache/
+out/
+
+# Dependency-root prose may be omitted; nested source directories named `docs` remain tracked.
+/vendor/*/docs/
+
+# Ignores development (and goerli) broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/*/5/
+/broadcast/**/dry-run/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules/
+ui/dist/
+ui/public/deployment.json
+bun.lockb
+
+# Disposable local evidence
+.devnet/
+reports/
+
+# Local deployment manifests; commit only reviewed examples
+deployments/*.local.json
+
+# v4hook plans and evidence
+.v4hook/
+
+# Resumable agent state; product requirements stay in tracked SPEC.md
+.workflow/
