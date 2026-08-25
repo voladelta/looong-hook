@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "v4hook-starter-app",
+      "name": "looong-hook-app",
       "dependencies": {
         "viem": "2.55.15",
       },

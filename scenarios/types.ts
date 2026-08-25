@@ -2,13 +2,20 @@ import type { Address, Hex, LocalAccount, PublicClient } from "viem";
 
 export interface DeploymentManifest {
   chainId: number;
+  network: string;
   rpcUrl: string;
+  pool: {
+    fee: number;
+    tickSpacing: number;
+  };
   contracts: {
     hook: Address;
     poolManager: Address;
     router: Address;
-    token?: Address;
-    nft?: Address;
+    looong: Address;
+    weth: Address;
+    launcher: Address;
+    factory: Address;
   };
 }
 

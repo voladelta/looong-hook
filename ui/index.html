@@ -3,17 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark light" />
-    <title>v4hook starter</title>
+    <meta name="color-scheme" content="dark" />
+    <title>LOOONG positions</title>
   </head>
   <body>
     <main>
-      <p class="eyebrow">Uniswap v4</p>
-      <h1>Hook interface</h1>
-      <p id="network">Loading deployment manifest…</p>
-      <dl id="contracts"></dl>
-      <button id="connect" type="button">Connect wallet</button>
-      <p id="status" role="status" aria-live="polite"></p>
+      <header>
+        <p class="eyebrow"><span translate="no">LOOONG / WETH</span> · Uniswap v4</p>
+        <h1>Stay looong.</h1>
+        <p id="network">Loading the deployment…</p>
+      </header>
+
+      <section aria-labelledby="account-title">
+        <div class="section-heading">
+          <h2 id="account-title">Wallet</h2>
+          <button id="connect" type="button">Connect wallet</button>
+        </div>
+        <p id="account">Not connected</p>
+        <dl id="wallet-state"></dl>
+        <div class="button-row">
+          <button id="claim-rebate" class="write-action" type="button">Claim rebate</button>
+          <button id="claim-rewards" class="write-action" type="button">Claim rewards</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="buy-title">
+        <h2 id="buy-title">Open a position</h2>
+        <p>Your LOOONG output stays in hook custody. Your WETH basis includes the 10 bps hook fee.</p>
+        <form id="buy-form">
+          <label for="weth-amount">WETH amount</label>
+          <input id="weth-amount" name="wethAmount" type="text" inputmode="decimal" value="0.01" required />
+          <label for="minimum-output">Minimum LOOONG output</label>
+          <input id="minimum-output" name="minimumOutput" type="text" inputmode="decimal" value="0" required />
+          <button id="buy" class="write-action" type="submit">Approve and buy</button>
+        </form>
+      </section>
+
+      <section aria-labelledby="position-title">
+        <h2 id="position-title">Manage a position</h2>
+        <p>Only the position owner can sell or withdraw. Anyone can activate a position after 30 days.</p>
+        <form id="position-form">
+          <label for="position-id">Position ID</label>
+          <div class="input-action">
+            <input id="position-id" name="positionId" type="text" inputmode="numeric" required />
+            <button id="inspect-position" type="button" class="secondary">Inspect</button>
+          </div>
+          <label for="position-amount">LOOONG amount</label>
+          <input id="position-amount" name="positionAmount" type="text" inputmode="decimal" value="0.001" />
+          <label for="minimum-weth-output">Minimum WETH output</label>
+          <input id="minimum-weth-output" name="minimumWethOutput" type="text" inputmode="decimal" value="0" />
+          <div class="button-row form-actions">
+            <button type="submit" name="action" value="sell" class="write-action">Sell</button>
+            <button type="submit" name="action" value="withdraw" class="secondary write-action">Withdraw</button>
+            <button type="submit" name="action" value="activate" class="secondary write-action">Activate rewards</button>
+          </div>
+        </form>
+        <dl id="position-state"></dl>
+      </section>
+
+      <p id="form-error" class="error" role="alert" hidden></p>
+
+      <section aria-labelledby="state-title">
+        <h2 id="state-title">Protocol state</h2>
+        <dl id="state"></dl>
+        <details>
+          <summary>Deployment addresses</summary>
+          <dl id="contracts"></dl>
+        </details>
+      </section>
+
+      <p id="status" role="status" aria-live="polite">Connect a wallet to open or manage a position.</p>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

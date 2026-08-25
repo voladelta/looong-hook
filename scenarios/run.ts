@@ -6,6 +6,7 @@ import { mnemonicToAccount } from "viem/accounts";
 
 import { prepareTrade } from "./trade.js";
 import type { DeploymentManifest } from "./types.js";
+import { verifyProduct } from "./verify.js";
 
 const root = resolve(import.meta.dirname, "..");
 const manifestPath = resolve(root, ".devnet/deployment.json");
@@ -30,7 +31,7 @@ if (defaultGasLimit < 21_000n) {
 const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DeploymentManifest;
 const chain = defineChain({
   id: manifest.chainId,
-  name: "v4hook devnet",
+  name: "LOOONG devnet",
   nativeCurrency: { name: "Dev Ether", symbol: "dETH", decimals: 18 },
   rpcUrls: { default: { http: [manifest.rpcUrl] } },
 });
@@ -165,6 +166,9 @@ await Promise.all(Array.from({ length: concurrency }, worker));
 results.sort((left, right) => left.index - right.index);
 failures.sort((left, right) => left.index - right.index);
 
+const productVerification =
+  failures.length === 0 ? await verifyProduct(publicClient, manifest, results.map((result) => result.address)) : undefined;
+
 await mkdir(resolve(root, "reports"), { recursive: true });
 await writeFile(
   reportPath,
@@ -176,6 +180,7 @@ await writeFile(
       failedTransactions: failures.length,
       transactions: results,
       failures,
+      productVerification,
     },
     null,
     2,

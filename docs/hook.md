@@ -31,29 +31,26 @@ delta owner, and recovery policy, and the hook enables only the callbacks those 
 Read only the symbols used by the chosen design. The pinned code is the implementation authority;
 external documentation is for a specifically missing current network fact, not startup research.
 
-## Native/token swap map
+## LOOONG/WETH swap map
 
-For a canonical pool with native currency as `currency0` and the companion token as `currency1`,
-freeze this matrix before implementing fee deltas:
+The router derives `zeroForOne` from the sorted `LOOONG` and WETH addresses. Freeze this matrix
+before you change fee deltas:
 
-| User operation | `zeroForOne` | `amountSpecified` | Native lane |
+| User operation | Input asset | `amountSpecified` | WETH lane |
 | --- | --- | --- | --- |
-| Buy, exact input | `true` | negative | specified |
-| Buy, exact output | `true` | positive | unspecified |
-| Sell, exact input | `false` | negative | unspecified |
-| Sell, exact output | `false` | positive | specified |
+| Buy, exact input | WETH | negative | specified |
+| Buy, exact output | WETH | positive | unspecified |
+| Sell, exact input | LOOONG | negative | unspecified |
+| Sell, exact output | LOOONG | positive | specified |
 
 Positive hook deltas mean the hook takes currency; PoolManager subtracts them from the router's
 delta. Prove the four rows against observed deltas and balances rather than duplicating this table
 inside production math.
 
-The testkit's `PoolSwapTest` is a fixture, not a production identity boundary. A hook that attributes
-buyers or beneficiaries needs an authenticated router/settlement path that captures payer and
-recipient before unlock and takes output directly to the recipient. Refund only value supplied by
-the current call; a router's pre-existing or forced native balance belongs to neither caller.
-`src/router/AuthenticatedNativeTokenRouter.sol` is the replaceable single-pool seed for that boundary;
-its integration test proves all four quadrants, spoof rejection, partial-fill rollback and forced
-native isolation through the real PoolManager.
+The testkit's `PoolSwapTest` is a fixture, not a production identity boundary. `src/LooongRouter.sol`
+captures the payer, owner, and recipient before unlock. It settles only ERC-20 assets. Native ETH is
+not supported. `test/integration/LooongHook.t.sol` proves the four ordinary quadrants, verified owner
+binding, partial-fill rollback, and claim conservation through the real PoolManager.
 
 Swap accounting is complete when an independent test oracle proves all four supported rows against
 observed deltas, balances, liabilities, remainders, and rollback behavior.

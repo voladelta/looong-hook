@@ -15,9 +15,9 @@ they are engineering requirements, not an audit claim.
 
 - Router context is not user identity. Bind payer and recipient through the settlement path.
 - Pull claims use effects-first accounting and resist reentrancy.
-- Forced native currency is separated from user liabilities and cannot be refunded to a later caller.
-- Prefer the pinned OpenZeppelin reentrancy guard at native claim/refund boundaries; custom locks
-  need a stronger reason and explicit reentrant proof.
+- WETH settlement is separated from unrelated token balances and cannot be refunded to a later caller.
+- Use the pinned OpenZeppelin reentrancy guard at position, claim, and launch boundaries. Custom
+  locks need a stronger reason and explicit reentrant proof.
 - Rounding policy and carried remainders conserve value over repeated operations.
 - Admin, treasury, minter and deployer roles are immutable or explicitly governed and tested.
 
@@ -31,7 +31,7 @@ they are engineering requirements, not an audit claim.
 ## Proof floor
 
 Test the real PoolManager path, direct callback rejection, all supported swap quadrants, permission
-bits, claims/custody conservation, token/NFT authority, malformed input, stale state and rollback.
+bits, claims/custody conservation, token authority, malformed input, stale state and rollback.
 Fuzz arithmetic boundaries and use stateful invariants for conservation and action accounting.
 Use `docs/testing.md` for proof ownership and gate criteria. Treat static-analysis annotations as
 local proof obligations rather than broad allowlists.

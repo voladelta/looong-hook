@@ -22,19 +22,17 @@ part of this workflow.
 
 ## Route the task
 
-Open only the smallest owned surface that can answer the request. Read `README.md` for starter
-orientation or its copy workflow, `foundry.toml` for Solidity build or test behavior, and
+Open only the smallest owned surface that can answer the request. Read `README.md` for product
+orientation, `foundry.toml` for Solidity build or test behavior, and
 `remappings.txt` when tracing an import. Generated evidence lives in `out/`, `cache/`, `broadcast/`,
 `.devnet/`, and `reports/`; treat it as output rather than source.
 
 | Trigger | Read first | Disclose next |
 | --- | --- | --- |
-| Hook callbacks, permissions, or deltas | `src/StarterHook.sol` and its exact pinned imports | `docs/hook.md`, then `docs/security.md` |
-| Authenticated native/token swaps | `src/router/AuthenticatedNativeTokenRouter.sol` and its integration test | `docs/hook.md` |
-| ERC-20 or NFT companion | `src/tokens/` and the exact OpenZeppelin base | `docs/tokens.md` |
+| Hook callbacks, permissions, or deltas | `src/LooongHook.sol` and its exact pinned imports | `docs/hook.md`, then `docs/security.md` |
+| Authenticated LOOONG/WETH swaps | `src/LooongRouter.sol` and `test/integration/LooongHook.t.sol` | `docs/hook.md` |
 | PoolManager, fuzz, or invariant proof | `test/integration/` or the affected test | `docs/testing.md` |
 | Loops, batches, cohorts, or storage growth | the public entry point and its maximum bound | `docs/gas.md` |
-| Chainlink randomness | `src/vrf/` and the exact pinned Chainlink base | `docs/vrf.md` |
 | Browser or Viem behavior | `ui/` and `deployments/` | `docs/dapp.md` |
 | One hundred local traders | `scenarios/` and `scripts/devnet-*` | `docs/devnet.md` |
 | Testnet preparation or deployment | `script/` and `scripts/testnet-*` | `docs/testnet.md` |
@@ -56,8 +54,8 @@ source-reading targets.
 - Gate any user-callable work that grows with inputs or storage through `docs/gas.md` before
   expanding downstream surfaces.
 
-The routed document owns branch-specific requirements for swaps, tokens, VRF, tests, devnet, and
-testnet. Apply every requirement on each branch the product includes.
+The routed document owns branch-specific requirements for swaps, tests, devnet, and testnet. Apply
+every requirement on each branch the product includes.
 
 ## Verify
 
