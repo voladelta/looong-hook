@@ -1,5 +1,7 @@
 # looong-hook
 
+![LOOONG / WETH project banner](assets/looong-banner.png)
+
 `looong-hook` is an immutable Uniswap v4 hook for one `LOOONG/WETH` pool. Verified buys create
 non-transferable positions in hook custody. Position owners can sell from custody, withdraw their
 `LOOONG`, activate rewards after 30 days, and claim WETH rebates or rewards.
