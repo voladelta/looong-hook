@@ -32,13 +32,20 @@
         <p>The complete fixed supply is created and locked into a new pool under the shared LOOONG hook.</p>
         <form id="launch-form">
           <label for="token-name">Token name</label>
-          <input id="token-name" name="tokenName" type="text" autocomplete="off" required />
+          <input id="token-name" name="tokenName" type="text" autocomplete="off" maxlength="64" required />
           <label for="token-symbol">Token symbol</label>
-          <input id="token-symbol" name="tokenSymbol" type="text" autocomplete="off" required />
+          <input id="token-symbol" name="tokenSymbol" type="text" autocomplete="off" maxlength="16" required />
           <label for="token-tagline">Tagline</label>
-          <input id="token-tagline" name="tokenTagline" type="text" autocomplete="off" />
+          <input id="token-tagline" name="tokenTagline" type="text" autocomplete="off" maxlength="160" />
           <label for="token-logo">Logo URI</label>
-          <input id="token-logo" name="tokenLogo" type="url" autocomplete="off" placeholder="ipfs://…" />
+          <input
+            id="token-logo"
+            name="tokenLogo"
+            type="url"
+            autocomplete="off"
+            maxlength="256"
+            placeholder="ipfs://…"
+          />
           <button id="launch" class="write-action" type="submit">Launch token</button>
         </form>
       </section>

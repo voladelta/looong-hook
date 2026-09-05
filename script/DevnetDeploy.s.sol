@@ -93,7 +93,8 @@ contract DevnetDeployScript is Script {
             deploymentSalt: bytes32(uint256(1)),
             sqrtPriceX96: Constants.SQRT_PRICE_1_1
         });
-        (address subject, PoolId poolId) = deployment.coordinator.openTokenMarket(args, address(0));
+        address expectedSubject = deployment.coordinator.previewTokenAddress(args);
+        (address subject, PoolId poolId) = deployment.coordinator.openTokenMarket(args, expectedSubject);
         deployment.subject = IERC20(subject);
         deployment.poolId = poolId;
         deployment.hook = deployment.coordinator.hook();

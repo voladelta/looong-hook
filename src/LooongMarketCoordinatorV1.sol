@@ -26,6 +26,10 @@ contract LooongMarketCoordinatorV1 is IUnlockCallback, ReentrancyGuard {
     uint256 public constant SUPPLY = 1_000_000_000e18;
     int24 public constant BAND_TICKS = 207_000;
     int24 public constant TICK_SPACING = 60;
+    uint256 public constant MAX_NAME_BYTES = 64;
+    uint256 public constant MAX_SYMBOL_BYTES = 16;
+    uint256 public constant MAX_TAGLINE_BYTES = 160;
+    uint256 public constant MAX_LOGO_URI_BYTES = 256;
     bytes32 public constant TOKEN_SALT_DOMAIN = keccak256("LOOONG_TOKEN_CREATE2_V1");
     bytes4 private constant LIQUIDITY_DOMAIN = bytes4(keccak256("LOOONG_FOUNDING_LIQUIDITY_V1"));
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
@@ -109,22 +113,12 @@ contract LooongMarketCoordinatorV1 is IUnlockCallback, ReentrancyGuard {
         nonReentrant
         returns (address subject, PoolId poolId)
     {
-        if (
-            args.expectedCreator != msg.sender || args.feeBeneficiary == address(0) || bytes(args.name).length == 0
-                || bytes(args.symbol).length == 0
-        ) revert InvalidLaunch();
-
-        bytes32 create2Salt = _tokenSalt(args.expectedCreator, args.deploymentSalt);
-        address prior = tokenByCreate2Salt[create2Salt];
-        if (prior != address(0)) revert TokenSaltAlreadyUsed(create2Salt, prior);
+        bytes32 create2Salt = _validateLaunch(args, expectedToken);
         subject = address(
             new LooongTokenV1{salt: create2Salt}(
                 args.name, args.symbol, args.tagline, args.logoURI, args.expectedCreator, SUPPLY
             )
         );
-        if (expectedToken != address(0) && subject != expectedToken) {
-            revert UnexpectedToken(expectedToken, subject);
-        }
 
         PoolKey memory key = router.poolKey(subject);
         hook.registerPool(key, args.feeBeneficiary);
@@ -159,6 +153,31 @@ contract LooongMarketCoordinatorV1 is IUnlockCallback, ReentrancyGuard {
 
     function previewTokenAddress(LaunchArgs calldata args) external view returns (address predicted) {
         bytes32 salt = _tokenSalt(args.expectedCreator, args.deploymentSalt);
+        predicted = _previewTokenAddress(args, salt);
+    }
+
+    function _validateLaunch(LaunchArgs calldata args, address expectedToken)
+        private
+        view
+        returns (bytes32 create2Salt)
+    {
+        uint256 nameLength = bytes(args.name).length;
+        uint256 symbolLength = bytes(args.symbol).length;
+        if (
+            args.expectedCreator != msg.sender || args.feeBeneficiary == address(0) || expectedToken == address(0)
+                || nameLength == 0 || nameLength > MAX_NAME_BYTES || symbolLength == 0
+                || symbolLength > MAX_SYMBOL_BYTES || bytes(args.tagline).length > MAX_TAGLINE_BYTES
+                || bytes(args.logoURI).length > MAX_LOGO_URI_BYTES
+        ) revert InvalidLaunch();
+
+        create2Salt = _tokenSalt(args.expectedCreator, args.deploymentSalt);
+        address prior = tokenByCreate2Salt[create2Salt];
+        if (prior != address(0)) revert TokenSaltAlreadyUsed(create2Salt, prior);
+        address predicted = _previewTokenAddress(args, create2Salt);
+        if (predicted != expectedToken) revert UnexpectedToken(expectedToken, predicted);
+    }
+
+    function _previewTokenAddress(LaunchArgs calldata args, bytes32 salt) private view returns (address predicted) {
         bytes32 initCodeHash = keccak256(
             abi.encodePacked(
                 type(LooongTokenV1).creationCode,

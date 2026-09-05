@@ -54,6 +54,10 @@ an expected-failure counter.
 Stateful proof is complete when every attempted action is classified exactly once, every material
 class succeeds, conservation holds after each sequence, and unexpected failures are zero.
 
+The LOOONG stateful invariant launches two subject tokens on opposite sides of WETH through the
+production coordinator. Both handlers share one hook and router while checking pool-bound positions,
+pool custody, action liveness, and global WETH-claim conservation.
+
 ## Run the gates
 
 Run the nearest focused proof during development, then `./scripts/check.sh`. Use Bun for the

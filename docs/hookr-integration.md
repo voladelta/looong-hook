@@ -14,8 +14,9 @@ openTokenMarket(args, predictedToken)
 ```
 
 The coordinator requires `args.expectedCreator == msg.sender`, derives the CREATE2 salt from that
-creator and the caller-provided deployment salt, and checks the predicted address before committing
-the market. The transaction then:
+creator and the caller-provided deployment salt, requires the nonzero predicted address before
+committing the market, and bounds every metadata field by its documented UTF-8 byte limit. The
+transaction then:
 
 1. creates the fixed-supply token;
 2. registers its token/WETH pool with the shared root;

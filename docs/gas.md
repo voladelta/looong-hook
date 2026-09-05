@@ -57,9 +57,10 @@ use. The deployment graph is feasible when every deployable artifact fits its si
 real launch path proves both success and full rollback.
 
 `LooongMarketCoordinatorTest.test_launchFitsTransactionBudgetAndUnexpectedAddressRollsBack` owns
-the LOOONG launch gate. One launch is constant work: one token deployment, one pool registration and
-initialization, and one founding-liquidity modification. The test enforces the default 12,000,000
-gas product budget and proves that an expected-token mismatch leaves no token code behind.
+the LOOONG launch gate. One launch is bounded by the coordinator's metadata byte limits: one token
+deployment, one pool registration and initialization, and one founding-liquidity modification. The
+test uses every maximum metadata length, enforces the default 12,000,000 gas product budget, and
+proves that an expected-token mismatch leaves no token code behind.
 
 ## Keep the limits separate
 

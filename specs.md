@@ -30,7 +30,11 @@ All user-facing copy, metadata, deployment manifests, and contract adaptations m
 | Subject supply | 1,000,000,000 tokens |
 | Uniswap v4 LP fee | 3,000 pips (0.30%) |
 | Tick spacing | 60 |
-| Initial liquidity range | Full range: ticks `-887220` to `887220` |
+| Initial liquidity range | One-sided 207,000-tick selling band anchored at the opening tick |
+| Token name | 1–64 UTF-8 bytes |
+| Token symbol | 1–16 UTF-8 bytes |
+| Token tagline | 0–160 UTF-8 bytes |
+| Token logo URI | 0–256 UTF-8 bytes |
 | Hook buy fee | 10 bps |
 | Hook sell fee | 300 bps |
 | Base protocol fee stream | 10 bps of gross WETH volume |

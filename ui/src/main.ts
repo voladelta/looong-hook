@@ -138,7 +138,10 @@ launchForm.addEventListener("submit", async (event) => {
     const symbol = element<HTMLInputElement>("#token-symbol").value.trim();
     const tagline = element<HTMLInputElement>("#token-tagline").value.trim();
     const logoURI = element<HTMLInputElement>("#token-logo").value.trim();
-    if (!name || !symbol) throw new Error("Enter a token name and symbol.");
+    requireUtf8Length(name, "Token name", 1, 64);
+    requireUtf8Length(symbol, "Token symbol", 1, 16);
+    requireUtf8Length(tagline, "Tagline", 0, 160);
+    requireUtf8Length(logoURI, "Logo URI", 0, 256);
     const deploymentSalt = keccak256(stringToHex(`${account}:${Date.now()}:${crypto.randomUUID()}`));
     const launchArgs = {
       name,
@@ -481,6 +484,13 @@ function parseAmount(input: HTMLInputElement, decimals: number, message: string,
   } catch {
     showFieldError(input, message);
     throw new Error(message);
+  }
+}
+
+function requireUtf8Length(value: string, label: string, minimum: number, maximum: number): void {
+  const length = new TextEncoder().encode(value).length;
+  if (length < minimum || length > maximum) {
+    throw new Error(`${label} must be between ${minimum} and ${maximum} UTF-8 bytes.`);
   }
 }
 

@@ -12,39 +12,61 @@ import {LooongRouter} from "../src/LooongRouter.sol";
 
 /// @notice Deploys only from a reviewed network manifest; the shell wrapper owns broadcast authority.
 contract TestnetDeployScript is Script {
+    struct DeploymentConfig {
+        IPoolManager manager;
+        IERC20 weth;
+        address beneficiary;
+        bytes32 hookSalt;
+        uint160 sqrtPriceX96;
+        address creator;
+        address expectedToken;
+        address expectedCoordinator;
+    }
+
     error InvalidManifest();
 
     function run() external {
         string memory manifestPath = vm.envString("DEPLOYMENT_MANIFEST");
         string memory json = vm.readFile(manifestPath);
-        uint256 chainId = vm.parseJsonUint(json, ".chainId");
-        IPoolManager manager = IPoolManager(vm.parseJsonAddress(json, ".contracts.poolManager"));
-        IERC20 weth = IERC20(vm.parseJsonAddress(json, ".contracts.weth"));
-        address beneficiary = vm.parseJsonAddress(json, ".feeBeneficiary");
-        bytes32 hookSalt = vm.parseJsonBytes32(json, ".root.hookSalt");
-        uint160 sqrtPriceX96 = uint160(vm.parseJsonUint(json, ".launch.sqrtPriceX96"));
-        address creator = vm.parseJsonAddress(json, ".token.creator");
-        if (
-            chainId != block.chainid || address(manager) == address(0) || address(weth) == address(0)
-                || beneficiary == address(0) || creator == address(0) || sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE
-                || sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE || address(manager).code.length == 0
-                || address(weth).code.length == 0
-        ) revert InvalidManifest();
+        DeploymentConfig memory config = _readConfig(json);
 
-        uint64 nonce = vm.getNonce(creator);
-        address expectedCoordinator = vm.computeCreateAddress(creator, nonce + 2);
-        vm.startBroadcast();
-        LooongRouter router = new LooongRouter(manager, expectedCoordinator, weth);
-        LooongHookFactory factory = new LooongHookFactory(manager, expectedCoordinator, address(router), weth);
-        LooongMarketCoordinatorV1 coordinator = new LooongMarketCoordinatorV1(manager, weth, hookSalt, router, factory);
-        _openTokenMarket(coordinator, json, creator, beneficiary, sqrtPriceX96);
+        vm.startBroadcast(config.creator);
+        LooongRouter router = new LooongRouter(config.manager, config.expectedCoordinator, config.weth);
+        LooongHookFactory factory =
+            new LooongHookFactory(config.manager, config.expectedCoordinator, address(router), config.weth);
+        LooongMarketCoordinatorV1 coordinator =
+            new LooongMarketCoordinatorV1(config.manager, config.weth, config.hookSalt, router, factory);
+        coordinator.openTokenMarket(_launchArgs(json, config), config.expectedToken);
         vm.stopBroadcast();
 
-        require(address(coordinator) == expectedCoordinator, "coordinator address mismatch");
+        require(address(coordinator) == config.expectedCoordinator, "coordinator address mismatch");
         require(address(router.hook()) == address(coordinator.hook()), "router binding mismatch");
     }
 
-    function _launchArgs(string memory json, address creator, address beneficiary, uint160 sqrtPriceX96)
+    function _readConfig(string memory json) private view returns (DeploymentConfig memory config) {
+        uint256 chainId = vm.parseJsonUint(json, ".chainId");
+        config.manager = IPoolManager(vm.parseJsonAddress(json, ".contracts.poolManager"));
+        config.weth = IERC20(vm.parseJsonAddress(json, ".contracts.weth"));
+        config.beneficiary = vm.parseJsonAddress(json, ".feeBeneficiary");
+        config.hookSalt = vm.parseJsonBytes32(json, ".root.hookSalt");
+        address manifestCoordinator = vm.parseJsonAddress(json, ".root.expectedCoordinator");
+        config.sqrtPriceX96 = uint160(vm.parseJsonUint(json, ".launch.sqrtPriceX96"));
+        config.creator = vm.parseJsonAddress(json, ".token.creator");
+        config.expectedToken = vm.parseJsonAddress(json, ".token.expectedAddress");
+        if (
+            chainId != block.chainid || address(config.manager) == address(0) || address(config.weth) == address(0)
+                || config.beneficiary == address(0) || manifestCoordinator == address(0) || config.creator == address(0)
+                || config.expectedToken == address(0) || config.sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE
+                || config.sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE || address(config.manager).code.length == 0
+                || address(config.weth).code.length == 0
+        ) revert InvalidManifest();
+
+        uint64 nonce = vm.getNonce(config.creator);
+        config.expectedCoordinator = vm.computeCreateAddress(config.creator, nonce + 2);
+        if (config.expectedCoordinator != manifestCoordinator) revert InvalidManifest();
+    }
+
+    function _launchArgs(string memory json, DeploymentConfig memory config)
         private
         view
         returns (LooongMarketCoordinatorV1.LaunchArgs memory)
@@ -54,22 +76,10 @@ contract TestnetDeployScript is Script {
             symbol: vm.parseJsonString(json, ".token.symbol"),
             tagline: vm.parseJsonString(json, ".token.tagline"),
             logoURI: vm.parseJsonString(json, ".token.logoURI"),
-            expectedCreator: creator,
-            feeBeneficiary: beneficiary,
+            expectedCreator: config.creator,
+            feeBeneficiary: config.beneficiary,
             deploymentSalt: vm.parseJsonBytes32(json, ".token.deploymentSalt"),
-            sqrtPriceX96: sqrtPriceX96
+            sqrtPriceX96: config.sqrtPriceX96
         });
-    }
-
-    function _openTokenMarket(
-        LooongMarketCoordinatorV1 coordinator,
-        string memory json,
-        address creator,
-        address beneficiary,
-        uint160 sqrtPriceX96
-    ) private {
-        coordinator.openTokenMarket(
-            _launchArgs(json, creator, beneficiary, sqrtPriceX96), vm.parseJsonAddress(json, ".token.expectedAddress")
-        );
     }
 }
