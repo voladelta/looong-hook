@@ -18,6 +18,8 @@ they are engineering requirements, not an audit claim.
   prepared Hookr intent from metadata or salt substitution.
 - Pull claims use effects-first accounting and resist reentrancy.
 - WETH settlement is separated from unrelated token balances and cannot be refunded to a later caller.
+- Unsolicited PoolManager WETH claims are surplus: they create no liability and cannot block trading
+  or redemption while actual claims continue to cover every accounted liability.
 - Use the pinned OpenZeppelin reentrancy guard at position, claim, and launch boundaries. Custom
   locks need a stronger reason and explicit reentrant proof.
 - Rounding policy and carried remainders conserve value over repeated operations.

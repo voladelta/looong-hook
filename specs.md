@@ -271,7 +271,9 @@ Claims follow checks-effects-interactions and are protected from reentrancy:
 - A reward owner may claim whole-unit WETH rewards to a chosen nonzero recipient; scaled fractional credit remains.
 
 Fee collection is held as PoolManager ERC-6909 WETH claims. Redemption burns the exact claims before taking underlying
-WETH for the recipient. A failed redemption must restore the accrued liability by reverting the transaction.
+WETH for the recipient. A failed redemption must restore the accrued liability by reverting the transaction. Claims
+received without a matching protocol fee are surplus: they create no entitlement and cannot make accounted liabilities
+unclaimable.
 
 ## 11. Required accounting invariants
 
@@ -281,7 +283,7 @@ The implementation must preserve all of the following after every successful ext
 hook LOOONG balance >= total remaining position tokens
 
 accounted WETH claims * 1e27
-  = base-fee liability * 1e27
+  >= base-fee liability * 1e27
   + total rebate liability * 1e27
   + total scaled reward liability
 ```
@@ -296,8 +298,8 @@ stream remainder =       (gross WETH * rate + prior remainder) % 1,000,000
 Claims never reset these remainders. Splitting the same accepted gross volume across swaps must not suppress the
 cumulative fee entitlement.
 
-Donations must not create fees, rewards, or positions. Accidental token transfers must not be treated as accounted
-assets.
+Donations must not create fees, rewards, or positions. Accidental token or PoolManager-claim transfers must not create
+accounted liabilities.
 
 ## 12. Security and failure requirements
 

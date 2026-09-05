@@ -457,8 +457,8 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
         return _ownerScaledRewardCredit[poolId][owner];
     }
 
-    function claimsAreConserved() external view returns (bool) {
-        return accountedWethClaims() * REWARD_PRECISION == accountingLiabilityScaled();
+    function claimsAreConserved() public view returns (bool) {
+        return accountedWethClaims() * REWARD_PRECISION >= accountingLiabilityScaled();
     }
 
     // Compatibility reads for the repository's original single-market consumers. New integrations
@@ -946,8 +946,6 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
     }
 
     function _assertClaims() private view {
-        if (accountedWethClaims() * REWARD_PRECISION != accountingLiabilityScaled()) {
-            revert AccountingInvariant();
-        }
+        if (!claimsAreConserved()) revert AccountingInvariant();
     }
 }
