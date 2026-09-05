@@ -6,18 +6,17 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPoolManager, ModifyLiquidityParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
-import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 
-import {LooongHook} from "./LooongHook.sol";
-import {LooongHookFactory} from "./LooongHookFactory.sol";
-import {LooongRouter} from "./LooongRouter.sol";
+import {LooongHook} from "../../src/LooongHook.sol";
+import {LooongHookFactory} from "../../src/LooongHookFactory.sol";
+import {LooongRouter} from "../../src/LooongRouter.sol";
 
-/// @notice One-shot pool launch whose direct PoolManager liquidity has no removal path.
+/// @notice Test-only existing-token bootstrap for exercising the shared root against arbitrary token orderings.
 contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using PoolIdLibrary for PoolKey;
@@ -50,7 +49,6 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
 
     LooongHook public hook;
     bool public launched;
-
     bool private _unlocking;
     bytes32 private _expectedUnlockHash;
 
@@ -63,8 +61,8 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
         looong = looong_;
         weth = weth_;
         feeBeneficiary = feeBeneficiary_;
-        router = new LooongRouter(manager_, address(this));
-        factory = new LooongHookFactory(manager_, address(this), address(router), looong_, weth_, feeBeneficiary_);
+        router = new LooongRouter(manager_, address(this), weth_);
+        factory = new LooongHookFactory(manager_, address(this), address(router), weth_);
     }
 
     function launch(
@@ -80,25 +78,18 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
 
         deployedHook = factory.deploy(salt);
         hook = deployedHook;
-        router.bind(looong, weth, deployedHook);
-        PoolKey memory key = router.poolKey();
-        deployedHook.registerPool(key);
+        router.bind(deployedHook);
+        router.setDefaultSubject(address(looong));
+        PoolKey memory key = router.poolKey(address(looong));
+        deployedHook.registerPool(key, feeBeneficiary);
         if (poolManager.initialize(key, sqrtPriceX96) != TickMath.getTickAtSqrtPrice(sqrtPriceX96)) {
             revert InvalidLiquidityDelta();
         }
 
-        // These balances separate prior accidental transfers from this caller's launch funds. The
-        // nonReentrant boundary and exact postcondition make an intermediate balance change revert.
-        // slither-disable-start reentrancy-balance
         uint256 looongBalanceBefore = looong.balanceOf(address(this));
         uint256 wethBalanceBefore = weth.balanceOf(address(this));
         looong.safeTransferFrom(msg.sender, address(this), looongAmountMaximum);
         weth.safeTransferFrom(msg.sender, address(this), wethAmountMaximum);
-        if (
-            looong.balanceOf(address(this)) - looongBalanceBefore != looongAmountMaximum
-                || weth.balanceOf(address(this)) - wethBalanceBefore != wethAmountMaximum
-        ) revert InvalidTokenTransfer();
-
         bool looongIsCurrency0 = Currency.unwrap(key.currency0) == address(looong);
         LiquidityRequest memory request = LiquidityRequest({
             key: key,
@@ -109,14 +100,11 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
         (uint256 amount0Used, uint256 amount1Used) = _addLiquidity(request);
         looongUsed = looongIsCurrency0 ? amount0Used : amount1Used;
         wethUsed = looongIsCurrency0 ? amount1Used : amount0Used;
-
-        _refundExact(looong, msg.sender, looongAmountMaximum - looongUsed);
-        _refundExact(weth, msg.sender, wethAmountMaximum - wethUsed);
+        _refund(looong, msg.sender, looongAmountMaximum - looongUsed);
+        _refund(weth, msg.sender, wethAmountMaximum - wethUsed);
         if (
             looong.balanceOf(address(this)) != looongBalanceBefore || weth.balanceOf(address(this)) != wethBalanceBefore
         ) revert InvalidTokenTransfer();
-        // slither-disable-end reentrancy-balance
-
         emit Launched(address(deployedHook), address(router), bytes32(PoolId.unwrap(key.toId())));
     }
 
@@ -125,7 +113,6 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
         if (!_unlocking || keccak256(data) != _expectedUnlockHash) revert InvalidUnlock();
         (bytes4 domain, LiquidityRequest memory request) = abi.decode(data, (bytes4, LiquidityRequest));
         if (domain != LIQUIDITY_DOMAIN) revert InvalidUnlock();
-
         (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
             request.key,
             ModifyLiquidityParams({
@@ -136,8 +123,9 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
             }),
             ""
         );
-        if (feesAccrued.amount0() != 0 || feesAccrued.amount1() != 0) revert InvalidLiquidityDelta();
-        if (delta.amount0() >= 0 || delta.amount1() >= 0) revert InvalidLiquidityDelta();
+        if (feesAccrued.amount0() != 0 || feesAccrued.amount1() != 0 || delta.amount0() >= 0 || delta.amount1() >= 0) {
+            revert InvalidLiquidityDelta();
+        }
         uint256 amount0Used = uint256(-int256(delta.amount0()));
         uint256 amount1Used = uint256(-int256(delta.amount1()));
         if (amount0Used > request.amount0Maximum || amount1Used > request.amount1Maximum) {
@@ -163,10 +151,7 @@ contract LooongLaunchV1 is IUnlockCallback, ReentrancyGuard {
         if (poolManager.settle() != amount) revert InvalidTokenTransfer();
     }
 
-    function _refundExact(IERC20 token, address recipient, uint256 amount) private {
-        if (amount == 0) return;
-        uint256 recipientBefore = token.balanceOf(recipient);
-        token.safeTransfer(recipient, amount);
-        if (token.balanceOf(recipient) - recipientBefore != amount) revert InvalidTokenTransfer();
+    function _refund(IERC20 token, address recipient, uint256 amount) private {
+        if (amount != 0) token.safeTransfer(recipient, amount);
     }
 }

@@ -4,9 +4,9 @@ import type { DeploymentManifest } from "./types.js";
 
 const hookAbi = parseAbi([
   "function nextPositionId() view returns (uint256)",
-  "function totalCustodiedTokens() view returns (uint256)",
+  "function totalCustodiedTokens(bytes32 poolId) view returns (uint256)",
   "function accountedWethClaims() view returns (uint256)",
-  "function custodyIsSolvent() view returns (bool)",
+  "function custodyIsSolvent(bytes32 poolId) view returns (bool)",
   "function claimsAreConserved() view returns (bool)",
   "function positions(uint256) view returns (address owner, uint64 openedAt, bool rewardActive, uint128 initialTokens, uint128 remainingTokens, uint128 soldTokens, uint128 withdrawnTokens, uint256 initialBasis, uint256 remainingBasis, uint256 soldBasis, uint256 withdrawnBasis, uint256 profitRemainder)",
 ]);
@@ -33,21 +33,27 @@ export async function verifyProduct(
         address: manifest.contracts.hook,
         abi: hookAbi,
         functionName: "totalCustodiedTokens",
+        args: [manifest.poolId],
       }),
       publicClient.readContract({
         address: manifest.contracts.hook,
         abi: hookAbi,
         functionName: "accountedWethClaims",
       }),
-      publicClient.readContract({ address: manifest.contracts.hook, abi: hookAbi, functionName: "custodyIsSolvent" }),
+      publicClient.readContract({
+        address: manifest.contracts.hook,
+        abi: hookAbi,
+        functionName: "custodyIsSolvent",
+        args: [manifest.poolId],
+      }),
       publicClient.readContract({ address: manifest.contracts.hook, abi: hookAbi, functionName: "claimsAreConserved" }),
     ]);
   const expectedNextPositionId = BigInt(traderAddresses.length + 1);
   if (nextPositionId !== expectedNextPositionId) {
     throw new Error(`expected nextPositionId ${expectedNextPositionId}, received ${nextPositionId}`);
   }
-  if (totalCustodiedTokens === 0n) throw new Error("verified buys did not create custodied LOOONG");
-  if (!custodyIsSolvent) throw new Error("LOOONG custody is insolvent");
+  if (totalCustodiedTokens === 0n) throw new Error("verified buys did not create custodied subject tokens");
+  if (!custodyIsSolvent) throw new Error("subject-token custody is insolvent");
   if (!claimsAreConserved) throw new Error("WETH claims do not match liabilities");
   const positionOwners = await Promise.all(
     traderAddresses.map(async (_, index) => {

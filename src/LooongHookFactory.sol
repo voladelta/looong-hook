@@ -31,36 +31,27 @@ contract LooongHookFactory {
     IPoolManager public immutable manager;
     address public immutable registrar;
     address public immutable router;
-    IERC20 public immutable looong;
     IERC20 public immutable weth;
-    address public immutable feeBeneficiary;
     address public immutable bytecodeStore;
+    address public immutable bytecodeStoreTail;
     bytes32 public immutable bytecodeHash;
 
-    constructor(
-        IPoolManager manager_,
-        address registrar_,
-        address router_,
-        IERC20 looong_,
-        IERC20 weth_,
-        address feeBeneficiary_
-    ) {
+    constructor(IPoolManager manager_, address registrar_, address router_, IERC20 weth_) {
         if (
             address(manager_) == address(0) || registrar_ == address(0) || router_ == address(0)
-                || address(looong_) == address(0) || address(weth_) == address(0) || feeBeneficiary_ == address(0)
-                || address(looong_) == address(weth_)
+                || address(weth_) == address(0)
         ) revert InvalidAddress();
         manager = manager_;
         registrar = registrar_;
         router = router_;
-        looong = looong_;
         weth = weth_;
-        feeBeneficiary = feeBeneficiary_;
-        bytes memory creationBlob = abi.encodePacked(
-            type(LooongHook).creationCode, abi.encode(manager_, registrar_, router_, looong_, weth_, feeBeneficiary_)
-        );
+        bytes memory creationBlob =
+            abi.encodePacked(type(LooongHook).creationCode, abi.encode(manager_, registrar_, router_, weth_));
         bytecodeHash = keccak256(creationBlob);
-        bytecodeStore = address(new LooongHookBytecodeStore(creationBlob));
+        uint256 split = creationBlob.length > 20_000 ? 20_000 : creationBlob.length;
+        bytecodeStore = address(new LooongHookBytecodeStore(_slice(creationBlob, 0, split)));
+        bytecodeStoreTail =
+            address(new LooongHookBytecodeStore(_slice(creationBlob, split, creationBlob.length - split)));
     }
 
     function deploy(bytes32 salt) external returns (LooongHook hook) {
@@ -68,11 +59,15 @@ contract LooongHookFactory {
         address predicted = computeAddress(salt);
         if (uint160(predicted) & ALL_FLAGS != REQUIRED_FLAGS) revert InvalidHookAddress(predicted);
         address store = bytecodeStore;
+        address tail = bytecodeStoreTail;
         address deployed;
         assembly ("memory-safe") {
-            let size := sub(extcodesize(store), 1)
+            let firstSize := sub(extcodesize(store), 1)
+            let tailSize := sub(extcodesize(tail), 1)
+            let size := add(firstSize, tailSize)
             let code := mload(0x40)
-            extcodecopy(store, code, 1, size)
+            extcodecopy(store, code, 1, firstSize)
+            extcodecopy(tail, add(code, firstSize), 1, tailSize)
             deployed := create2(0, code, size, salt)
             mstore(0x40, add(code, and(add(size, 0x1f), not(0x1f))))
         }
@@ -86,5 +81,12 @@ contract LooongHookFactory {
 
     function creationCodeHash() external view returns (bytes32) {
         return bytecodeHash;
+    }
+
+    function _slice(bytes memory source, uint256 start, uint256 length) private pure returns (bytes memory result) {
+        result = new bytes(length);
+        assembly ("memory-safe") {
+            mcopy(add(result, 0x20), add(add(source, 0x20), start), length)
+        }
     }
 }

@@ -8,13 +8,14 @@ export interface DeploymentManifest {
     fee: number;
     tickSpacing: number;
   };
+  poolId: Hex;
   contracts: {
     hook: Address;
     poolManager: Address;
     router: Address;
-    looong: Address;
+    subject: Address;
     weth: Address;
-    launcher: Address;
+    coordinator: Address;
     factory: Address;
   };
 }

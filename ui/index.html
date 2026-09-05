@@ -9,7 +9,7 @@
   <body>
     <main>
       <header>
-        <p class="eyebrow"><span translate="no">LOOONG / WETH</span> · Uniswap v4</p>
+        <p class="eyebrow"><span translate="no">LOOONG</span> token launches · Uniswap v4</p>
         <h1>Stay looong.</h1>
         <p id="network">Loading the deployment…</p>
       </header>
@@ -27,13 +27,29 @@
         </div>
       </section>
 
+      <section aria-labelledby="launch-title">
+        <h2 id="launch-title">Launch a token with LOOONG</h2>
+        <p>The complete fixed supply is created and locked into a new pool under the shared LOOONG hook.</p>
+        <form id="launch-form">
+          <label for="token-name">Token name</label>
+          <input id="token-name" name="tokenName" type="text" autocomplete="off" required />
+          <label for="token-symbol">Token symbol</label>
+          <input id="token-symbol" name="tokenSymbol" type="text" autocomplete="off" required />
+          <label for="token-tagline">Tagline</label>
+          <input id="token-tagline" name="tokenTagline" type="text" autocomplete="off" />
+          <label for="token-logo">Logo URI</label>
+          <input id="token-logo" name="tokenLogo" type="url" autocomplete="off" placeholder="ipfs://…" />
+          <button id="launch" class="write-action" type="submit">Launch token</button>
+        </form>
+      </section>
+
       <section aria-labelledby="buy-title">
         <h2 id="buy-title">Open a position</h2>
-        <p>Your LOOONG output stays in hook custody. Your WETH basis includes the 10 bps hook fee.</p>
+        <p>Your subject-token output stays in hook custody. Your WETH basis includes the 10 bps hook fee.</p>
         <form id="buy-form">
           <label for="weth-amount">WETH amount</label>
           <input id="weth-amount" name="wethAmount" type="text" inputmode="decimal" value="0.01" required />
-          <label for="minimum-output">Minimum LOOONG output</label>
+          <label for="minimum-output">Minimum subject-token output</label>
           <input id="minimum-output" name="minimumOutput" type="text" inputmode="decimal" value="0" required />
           <button id="buy" class="write-action" type="submit">Approve and buy</button>
         </form>
@@ -48,7 +64,7 @@
             <input id="position-id" name="positionId" type="text" inputmode="numeric" required />
             <button id="inspect-position" type="button" class="secondary">Inspect</button>
           </div>
-          <label for="position-amount">LOOONG amount</label>
+          <label for="position-amount">Subject-token amount</label>
           <input id="position-amount" name="positionAmount" type="text" inputmode="decimal" value="0.001" />
           <label for="minimum-weth-output">Minimum WETH output</label>
           <input id="minimum-weth-output" name="minimumWethOutput" type="text" inputmode="decimal" value="0" />

@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
@@ -10,10 +11,10 @@ import {StdInvariant} from "forge-std/StdInvariant.sol";
 
 import {LooongHook} from "../../src/LooongHook.sol";
 import {LooongHookFactory} from "../../src/LooongHookFactory.sol";
-import {LooongLaunchV1} from "../../src/LooongLaunchV1.sol";
 import {LooongRouter} from "../../src/LooongRouter.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {InvariantActionAccounting} from "../utils/InvariantActionAccounting.sol";
+import {LooongLaunchV1} from "../utils/LooongExistingTokenFixture.sol";
 
 contract LooongInvariantHandler is InvariantActionAccounting {
     bytes4 private constant BUY = bytes4(keccak256("buy"));
@@ -136,8 +137,9 @@ contract LooongInvariantHandler is InvariantActionAccounting {
     function actionClaimBase() external {
         _beginAction(CLAIM_BASE);
         if (hook.baseFeeLiability() == 0) _ordinaryBuy(0.01 ether);
+        PoolId poolId = hook.canonicalPoolId();
         vm.prank(beneficiary);
-        try hook.claimBaseFees(beneficiary) {
+        try hook.claimBaseFees(poolId, beneficiary) {
             _assertProtocol();
             _recordSuccess(CLAIM_BASE);
         } catch {
@@ -156,7 +158,7 @@ contract LooongInvariantHandler is InvariantActionAccounting {
                 return;
             }
         }
-        try hook.claimRebate(owner) {
+        try hook.claimRebate(hook.canonicalPoolId(), owner) {
             _assertProtocol();
             _recordSuccess(CLAIM_REBATE);
         } catch {
@@ -174,8 +176,9 @@ contract LooongInvariantHandler is InvariantActionAccounting {
 
         uint256 output = _ordinaryBuy(0.01 ether);
         router.swapExactInput(false, uint128(output / 2), 1, address(this), _priceLimit(false), uint64(block.timestamp));
+        PoolId poolId = hook.canonicalPoolId();
         vm.prank(owner);
-        try hook.claimRewards(owner) {
+        try hook.claimRewards(poolId, owner) {
             _assertProtocol();
             _recordSuccess(CLAIM_REWARD);
         } catch {
@@ -246,7 +249,7 @@ contract LooongInvariantHandler is InvariantActionAccounting {
     }
 
     function _assertProtocol() private view {
-        assertTrue(hook.custodyIsSolvent(), "custody insolvent");
+        assertTrue(hook.custodyIsSolvent(hook.canonicalPoolId()), "custody insolvent");
         assertTrue(hook.claimsAreConserved(), "claims not conserved");
     }
 
@@ -286,6 +289,14 @@ contract LooongInvariantTest is StdInvariant, BaseTest {
 
         handler = new LooongInvariantHandler(hook, launcher.router(), looong, weth, beneficiary);
         handler.seedPositions();
+        handler.actionBuy(0, 0.01 ether);
+        handler.actionSell(0);
+        handler.actionWithdraw(1);
+        handler.actionActivate(2);
+        handler.actionOrdinarySwap(0.01 ether);
+        handler.actionClaimBase();
+        handler.actionClaimRebate(0);
+        handler.actionClaimReward(1);
 
         bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = handler.actionBuy.selector;
@@ -301,7 +312,7 @@ contract LooongInvariantTest is StdInvariant, BaseTest {
     }
 
     function invariant_conservationAndPositionAccounting() public view {
-        assertTrue(hook.custodyIsSolvent());
+        assertTrue(hook.custodyIsSolvent(hook.canonicalPoolId()));
         assertTrue(hook.claimsAreConserved());
         handler.assertActionAccounting();
 

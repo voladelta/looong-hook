@@ -47,7 +47,7 @@ actual transaction boundary during deployment preparation. The local Foundry rou
 
 ## Measure the deployment graph
 
-When a factory or launcher embeds creation code, measure the long-lived deployer's runtime and
+When a factory or coordinator embeds creation code, measure the long-lived deployer's runtime and
 initcode after the first complete atomic deployment slice. Run `forge build --sizes` and the focused
 launch test before building scripts, scenarios or UI around that graph.
 
@@ -55,6 +55,11 @@ If the graph exceeds EIP-170 or EIP-3860, reshape it before expanding downstream
 helper deployers remain narrowly authorized, preserve atomic rollback and reject direct outsider
 use. The deployment graph is feasible when every deployable artifact fits its size limit and the
 real launch path proves both success and full rollback.
+
+`LooongMarketCoordinatorTest.test_launchFitsTransactionBudgetAndUnexpectedAddressRollsBack` owns
+the LOOONG launch gate. One launch is constant work: one token deployment, one pool registration and
+initialization, and one founding-liquidity modification. The test enforces the default 12,000,000
+gas product budget and proves that an expected-token mismatch leaves no token code behind.
 
 ## Keep the limits separate
 

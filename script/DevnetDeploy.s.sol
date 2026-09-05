@@ -3,14 +3,14 @@ pragma solidity ^0.8.26;
 
 import {Script} from "forge-std/Script.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
-import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 
 import {LooongHook} from "../src/LooongHook.sol";
 import {LooongHookFactory} from "../src/LooongHookFactory.sol";
-import {LooongLaunchV1} from "../src/LooongLaunchV1.sol";
+import {LooongMarketCoordinatorV1} from "../src/LooongMarketCoordinatorV1.sol";
 import {LooongRouter} from "../src/LooongRouter.sol";
 import {V4PoolManagerDeployer} from "../test/utils/v4hook-testkit/artifacts/V4PoolManager.sol";
 
@@ -37,13 +37,14 @@ contract DevnetDeployScript is Script {
 
     struct Deployment {
         IPoolManager manager;
-        LooongDevnetToken looong;
+        IERC20 subject;
         LooongDevnetToken weth;
-        LooongLaunchV1 launcher;
+        LooongMarketCoordinatorV1 coordinator;
         LooongHookFactory factory;
         LooongHook hook;
         LooongRouter router;
         bytes32 salt;
+        PoolId poolId;
     }
 
     function run() external {
@@ -66,29 +67,36 @@ contract DevnetDeployScript is Script {
     {
         vm.startBroadcast(deployerKey);
         deployment.manager = IPoolManager(V4PoolManagerDeployer.deploy(address(0x4444)));
-        deployment.looong = new LooongDevnetToken("LOOONG", "LOOONG", deployer, 10_000_000 ether);
         deployment.weth = new LooongDevnetToken("Wrapped Ether", "WETH", deployer, 10_000_000 ether);
         for (uint256 i; i < TRADER_COUNT; ++i) {
             deployment.weth.devnetMint(traders[i], 2 ether);
         }
 
-        deployment.launcher = new LooongLaunchV1(deployment.manager, deployment.looong, deployment.weth, deployer);
-        deployment.factory = deployment.launcher.factory();
-        deployment.salt = _findSalt(deployment.factory);
-        uint128 liquidity = 10_000 ether;
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            Constants.SQRT_PRICE_1_1,
-            TickMath.getSqrtPriceAtTick(TickMath.minUsableTick(60)),
-            TickMath.getSqrtPriceAtTick(TickMath.maxUsableTick(60)),
-            liquidity
+        uint64 nonce = vm.getNonce(deployer);
+        address expectedCoordinator = vm.computeCreateAddress(deployer, nonce + 2);
+        deployment.router = new LooongRouter(deployment.manager, expectedCoordinator, IERC20(address(deployment.weth)));
+        deployment.factory = new LooongHookFactory(
+            deployment.manager, expectedCoordinator, address(deployment.router), IERC20(address(deployment.weth))
         );
-        uint256 looongMaximum = address(deployment.looong) < address(deployment.weth) ? amount0 + 1 : amount1 + 1;
-        uint256 wethMaximum = address(deployment.looong) < address(deployment.weth) ? amount1 + 1 : amount0 + 1;
-        deployment.looong.approve(address(deployment.launcher), looongMaximum);
-        deployment.weth.approve(address(deployment.launcher), wethMaximum);
-        (deployment.hook,,) = deployment.launcher
-        .launch(deployment.salt, Constants.SQRT_PRICE_1_1, liquidity, looongMaximum, wethMaximum);
-        deployment.router = deployment.launcher.router();
+        deployment.salt = _findSalt(deployment.factory);
+        deployment.coordinator = new LooongMarketCoordinatorV1(
+            deployment.manager, IERC20(address(deployment.weth)), deployment.salt, deployment.router, deployment.factory
+        );
+        require(address(deployment.coordinator) == expectedCoordinator, "coordinator address mismatch");
+        LooongMarketCoordinatorV1.LaunchArgs memory args = LooongMarketCoordinatorV1.LaunchArgs({
+            name: "LOOONG Devnet",
+            symbol: "LOOONG",
+            tagline: "A token launched with LOOONG",
+            logoURI: "ipfs://looong-devnet",
+            expectedCreator: deployer,
+            feeBeneficiary: deployer,
+            deploymentSalt: bytes32(uint256(1)),
+            sqrtPriceX96: Constants.SQRT_PRICE_1_1
+        });
+        (address subject, PoolId poolId) = deployment.coordinator.openTokenMarket(args, address(0));
+        deployment.subject = IERC20(subject);
+        deployment.poolId = poolId;
+        deployment.hook = deployment.coordinator.hook();
         vm.stopBroadcast();
     }
 
@@ -121,6 +129,9 @@ contract DevnetDeployScript is Script {
             vm.envString("DEVNET_RPC_URL"),
             '",\n',
             '  "pool": {"fee": 3000, "tickSpacing": 60},\n',
+            '  "poolId": "',
+            vm.toString(bytes32(PoolId.unwrap(deployment.poolId))),
+            '",\n',
             '  "salt": "',
             vm.toString(deployment.salt),
             '",\n',
@@ -128,14 +139,14 @@ contract DevnetDeployScript is Script {
             '    "poolManager": "',
             vm.toString(address(deployment.manager)),
             '",\n',
-            '    "looong": "',
-            vm.toString(address(deployment.looong)),
+            '    "subject": "',
+            vm.toString(address(deployment.subject)),
             '",\n',
             '    "weth": "',
             vm.toString(address(deployment.weth)),
             '",\n',
-            '    "launcher": "',
-            vm.toString(address(deployment.launcher)),
+            '    "coordinator": "',
+            vm.toString(address(deployment.coordinator)),
             '",\n',
             '    "factory": "',
             vm.toString(address(deployment.factory)),

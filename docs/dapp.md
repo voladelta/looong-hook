@@ -30,6 +30,12 @@ decoded contract failures into an actionable message while retaining diagnostic 
 Treat RPC reads as fallible: expose unavailable or stale state, bound receipt polling and retry
 idempotent reads through a deliberate fallback. A transaction hash is progress, not completion.
 
+The launch form calls `LooongMarketCoordinatorV1.openTokenMarket` directly. It binds the connected
+wallet as both declared creator and initial fee beneficiary, generates fresh creator salt entropy,
+and selects the emitted subject and PoolId only after the launch receipt succeeds. Subsequent buys,
+sells, rebates and reward reads carry that selected market identity explicitly; the shared root does
+not infer a user market from global state.
+
 ## Prove the render
 
 After typecheck and production build, serve the configured application in a real browser at desktop
