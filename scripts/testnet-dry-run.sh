@@ -22,6 +22,7 @@ manifest="$root/deployments/$network.json"
 
 rpc_env=$(jq -r '.rpcEnv' "$manifest")
 fork_block=$(jq -r '.forkBlock' "$manifest")
+creator=$(jq -er '.token.creator' "$manifest")
 rpc_url=$(printenv "$rpc_env" || true)
 [ -n "$rpc_url" ] || {
     echo "$rpc_env is required" >&2
@@ -30,5 +31,6 @@ rpc_url=$(printenv "$rpc_env" || true)
 
 cd "$root"
 DEPLOYMENT_MANIFEST="$manifest" forge script script/TestnetDeploy.s.sol:TestnetDeployScript \
+    --sender "$creator" \
     --fork-url "$rpc_url" \
     --fork-block-number "$fork_block"

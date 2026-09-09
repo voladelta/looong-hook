@@ -90,7 +90,12 @@ The shared router and permission-mined root are installed once per chain. Each u
 3. register and initialize its exact token/WETH pool under the shared root;
 4. place the complete supply in a one-sided founding band without requiring creator WETH;
 5. retain the liquidity position permanently in the coordinator; and
-6. burn any sub-unit liquidity-rounding residue.
+6. send liquidity-rounding residue to the dead address without reducing the fixed total supply.
+
+When the subject is currency0, the band runs from the opening tick to opening tick + 207,000.
+When the subject is currency1, it runs from opening tick - 207,000 to the opening tick. Both ends must
+remain within usable ticks `-887220` and `887220`. The coordinator holds no remaining subject tokens
+after launch and exposes no path to collect the founding position's LP fees.
 
 The caller must equal the declared creator. A repeated creator salt must revert atomically. The coordinator exposes no
 liquidity removal, rescue, ownership, upgrade, or arbitrary-call path.
@@ -242,7 +247,7 @@ excluded from that distribution. The seller receives the full 290 bps component 
 - the exit has no eligible profit; or
 - no other mature holder is eligible to receive rewards.
 
-Rebates accrue as WETH liabilities keyed by seller and are claimed separately from swap output.
+Rebates accrue as WETH liabilities keyed by PoolId and seller and are claimed separately from swap output.
 
 ## 9. Maturity and rewards
 
@@ -284,10 +289,12 @@ unclaimable.
 The implementation must preserve all of the following after every successful external operation:
 
 ```text
-hook LOOONG balance >= total remaining position tokens
+hook subject balance >= total remaining position tokens in that subject's PoolId
+
+actual PoolManager WETH claims >= accounted WETH claims
 
 accounted WETH claims * 1e27
-  >= base-fee liability * 1e27
+  = base-fee liability * 1e27
   + total rebate liability * 1e27
   + total scaled reward liability
 ```
@@ -302,8 +309,11 @@ stream remainder =       (gross WETH * rate + prior remainder) % 1,000,000
 Claims never reset these remainders. Splitting the same accepted gross volume across swaps must not suppress the
 cumulative fee entitlement.
 
-Donations must not create fees, rewards, or positions. Accidental token or PoolManager-claim transfers must not create
-accounted liabilities.
+Accounted WETH claims are claims minted by the hook for collected fees, less claims burned for redemptions.
+The liabilities in the equality are summed across all PoolIds. Unsolicited ERC-6909 transfers or mints to
+the hook create surplus backing, leave liabilities unchanged, and must not block swaps or claims in any
+pool. Surplus has no redemption or rescue path. Donations must not create fees, rewards, or positions.
+Accidental token transfers must not be treated as accounted assets.
 
 ## 12. Security and failure requirements
 
@@ -339,7 +349,7 @@ The reference design has no:
 - project treasury withdrawal;
 - ERC-721 representation of positions;
 - native ETH quote support;
-- generic token deployment, minting, metadata, or supply allocation;
+- arbitrary token implementations, post-launch minting, mutable metadata, or creator supply allocations;
 - same-pool swap initiated by the hook;
 - rescue, sweep, or arbitrary external call; or
 - recovery path for accidentally transferred unsupported assets.
@@ -353,7 +363,7 @@ review before production use.
 At minimum, the executable test suite must prove:
 
 - exact frozen parameters and callback permission bits;
-- atomic one-pool launch and permanently locked initial liquidity;
+- atomic launches of multiple subject pools under one root, with permanently locked one-sided founding liquidity;
 - verified buys create custodied positions with executed gross WETH basis;
 - partial and full sells conserve token amounts and basis;
 - free withdrawals return `LOOONG` and destroy proportional basis;
@@ -367,7 +377,8 @@ At minimum, the executable test suite must prove:
 - current exact-output witnesses work while stale, forged, and exact-input witnesses fail;
 - intent mutation, replay, expiry, wrong-router, wrong-pool, and wrong-manager calls fail;
 - claims cannot be redirected or repeated;
-- donations do not affect fees, rewards, or positions; and
+- donations do not affect fees, rewards, or positions or prevent subsequent swaps and claims;
+- selecting an earlier market after another launch or browser reload preserves authoritative pool identity; and
 - stateful sequences preserve token, basis, custody, and WETH-liability conservation.
 
 Independent static analysis, mainnet-fork lifecycle testing, gas profiling, economic review, security review, deployed

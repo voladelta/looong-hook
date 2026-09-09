@@ -23,14 +23,14 @@ const maxSqrtPrice = 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_9
 
 export async function prepareTrade(context: TradeContext): Promise<PreparedTrade> {
   const block = await context.publicClient.getBlock();
-  const wethIsCurrency0 = BigInt(context.manifest.contracts.weth) < BigInt(context.manifest.contracts.subject);
+  const wethIsCurrency0 = BigInt(context.manifest.contracts.weth) < BigInt(context.market.subject);
   return {
     to: context.manifest.contracts.router,
     data: encodeFunctionData({
       abi: routerAbi,
       functionName: "buy",
       args: [
-        context.manifest.contracts.subject,
+        context.market.subject,
         parseEther("0.01"),
         1n,
         wethIsCurrency0 ? minSqrtPrice + 1n : maxSqrtPrice - 1n,

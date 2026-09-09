@@ -28,6 +28,7 @@ run_step "forge format" forge fmt --check
 run_step "forge build and sizes" forge build --sizes
 run_step "forge tests" forge test
 run_step "devnet startup cleanup" "$root/scripts/test-devnet-startup-cleanup.sh"
+run_step "testnet creator and sender" "$root/scripts/testnet-sender-check.sh"
 
 if command -v slither >/dev/null 2>&1; then
     run_step "slither fail-high" slither . --filter-paths 'vendor/' --fail-high
@@ -48,6 +49,7 @@ if [ "${SKIP_APP:-0}" != "1" ]; then
         exit 1
     }
     run_step "TypeScript typecheck" bun run typecheck
+    run_step "UI market tests" bun run test:ui
     run_step "Vite production build" bun run ui:build
 fi
 

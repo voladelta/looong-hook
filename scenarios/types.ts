@@ -24,7 +24,13 @@ export interface TradeContext {
   account: LocalAccount;
   index: number;
   manifest: DeploymentManifest;
+  market: Market;
   publicClient: PublicClient;
+}
+
+export interface Market {
+  subject: Address;
+  poolId: Hex;
 }
 
 export interface PreparedTrade {

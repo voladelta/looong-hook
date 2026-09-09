@@ -24,13 +24,21 @@ contract TestnetDeployScript is Script {
     }
 
     error InvalidManifest();
+    error CreatorSenderMismatch(address creator, address sender);
 
     function run() external {
         string memory manifestPath = vm.envString("DEPLOYMENT_MANIFEST");
         string memory json = vm.readFile(manifestPath);
         DeploymentConfig memory config = _readConfig(json);
 
-        vm.startBroadcast(config.creator);
+        vm.startBroadcast();
+        (, address sender,) = vm.readCallers();
+        if (sender != config.creator) revert CreatorSenderMismatch(config.creator, sender);
+
+        uint64 nonce = vm.getNonce(sender);
+        address predictedCoordinator = vm.computeCreateAddress(sender, nonce + 2);
+        if (predictedCoordinator != config.expectedCoordinator) revert InvalidManifest();
+
         LooongRouter router = new LooongRouter(config.manager, config.expectedCoordinator, config.weth);
         LooongHookFactory factory =
             new LooongHookFactory(config.manager, config.expectedCoordinator, address(router), config.weth);
@@ -49,26 +57,22 @@ contract TestnetDeployScript is Script {
         config.weth = IERC20(vm.parseJsonAddress(json, ".contracts.weth"));
         config.beneficiary = vm.parseJsonAddress(json, ".feeBeneficiary");
         config.hookSalt = vm.parseJsonBytes32(json, ".root.hookSalt");
-        address manifestCoordinator = vm.parseJsonAddress(json, ".root.expectedCoordinator");
+        config.expectedCoordinator = vm.parseJsonAddress(json, ".root.expectedCoordinator");
         config.sqrtPriceX96 = uint160(vm.parseJsonUint(json, ".launch.sqrtPriceX96"));
         config.creator = vm.parseJsonAddress(json, ".token.creator");
         config.expectedToken = vm.parseJsonAddress(json, ".token.expectedAddress");
         if (
             chainId != block.chainid || address(config.manager) == address(0) || address(config.weth) == address(0)
-                || config.beneficiary == address(0) || manifestCoordinator == address(0) || config.creator == address(0)
-                || config.expectedToken == address(0) || config.sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE
-                || config.sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE || address(config.manager).code.length == 0
-                || address(config.weth).code.length == 0
+                || config.beneficiary == address(0) || config.expectedCoordinator == address(0)
+                || config.creator == address(0) || config.expectedToken == address(0)
+                || config.sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE || config.sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE
+                || address(config.manager).code.length == 0 || address(config.weth).code.length == 0
         ) revert InvalidManifest();
-
-        uint64 nonce = vm.getNonce(config.creator);
-        config.expectedCoordinator = vm.computeCreateAddress(config.creator, nonce + 2);
-        if (config.expectedCoordinator != manifestCoordinator) revert InvalidManifest();
     }
 
     function _launchArgs(string memory json, DeploymentConfig memory config)
         private
-        view
+        pure
         returns (LooongMarketCoordinatorV1.LaunchArgs memory)
     {
         return LooongMarketCoordinatorV1.LaunchArgs({

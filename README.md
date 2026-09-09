@@ -42,8 +42,9 @@ Run the complete local deployment and the 100-wallet scenario:
 ./scripts/devnet-check.sh
 ```
 
-The command starts Anvil, installs the shared root, launches a token through the coordinator, runs
-the trades, verifies protocol conservation, and writes `reports/devnet.json`. It prints `DEVNET_OK`
+The command starts Anvil, installs the shared root, launches two tokens with opposite currency
+orderings through the coordinator, runs the trades across both pools, verifies protocol
+conservation, and writes `reports/devnet.json`. It prints `DEVNET_OK`
 only after all steps pass.
 
 Run the dapp against the generated devnet manifest:

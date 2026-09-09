@@ -2,11 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
-import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
@@ -18,37 +14,7 @@ import {LooongMarketCoordinatorV1} from "../../src/LooongMarketCoordinatorV1.sol
 import {LooongRouter} from "../../src/LooongRouter.sol";
 import {LooongTokenV1} from "../../src/LooongTokenV1.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
-
-contract LooongClaimDonor is IUnlockCallback {
-    using SafeERC20 for IERC20;
-
-    struct Request {
-        address payer;
-        IERC20 token;
-        address recipient;
-        uint256 amount;
-    }
-
-    IPoolManager private immutable manager;
-
-    constructor(IPoolManager manager_) {
-        manager = manager_;
-    }
-
-    function donate(IERC20 token, address recipient, uint256 amount) external {
-        manager.unlock(abi.encode(Request(msg.sender, token, recipient, amount)));
-    }
-
-    function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        require(msg.sender == address(manager));
-        Request memory request = abi.decode(data, (Request));
-        manager.mint(request.recipient, uint160(address(request.token)), request.amount);
-        manager.sync(Currency.wrap(address(request.token)));
-        request.token.safeTransferFrom(request.payer, address(manager), request.amount);
-        require(manager.settle() == request.amount);
-        return "";
-    }
-}
+import {ForcedWethClaims} from "../utils/ForcedWethClaims.sol";
 
 contract LooongMarketCoordinatorTest is BaseTest {
     using PoolIdLibrary for PoolKey;
@@ -119,15 +85,16 @@ contract LooongMarketCoordinatorTest is BaseTest {
     function test_unsolicitedWethClaimSurplusDoesNotFreezeSharedRoot() public {
         (address alpha, PoolId alphaPool) = _launch(alice, "Alpha", "ALPHA", bytes32(uint256(10)));
         (address beta, PoolId betaPool) = _launch(bob, "Beta", "BETA", bytes32(uint256(11)));
-        LooongClaimDonor donor = new LooongClaimDonor(poolManager);
+        ForcedWethClaims donor = new ForcedWethClaims(poolManager, IERC20(address(weth)));
 
+        weth.mint(address(donor), 1);
         weth.mint(alice, 1 ether);
-        vm.startPrank(alice);
-        weth.approve(address(donor), 1);
-        donor.donate(IERC20(address(weth)), address(hook), 1);
-        assertEq(hook.accountedWethClaims(), 1);
+        donor.donate(address(hook), 1, false);
+        assertEq(hook.accountedWethClaims(), 0);
+        assertEq(poolManager.balanceOf(address(hook), uint160(address(weth))), 1);
         assertTrue(hook.claimsAreConserved());
 
+        vm.startPrank(alice);
         weth.approve(address(router), type(uint256).max);
         router.buy(alpha, 0.1 ether, 1, _priceLimit(alpha, true), uint64(block.timestamp));
         router.buy(beta, 0.1 ether, 1, _priceLimit(beta, true), uint64(block.timestamp));
@@ -138,7 +105,8 @@ contract LooongMarketCoordinatorTest is BaseTest {
         hook.claimBaseFees(betaPool, beneficiary);
         vm.stopPrank();
 
-        assertEq(hook.accountedWethClaims(), 1);
+        assertEq(hook.accountedWethClaims(), 0);
+        assertEq(poolManager.balanceOf(address(hook), uint160(address(weth))), 1);
         assertEq(hook.accountingLiabilityScaled(), 0);
         assertTrue(hook.claimsAreConserved());
     }
@@ -159,6 +127,71 @@ contract LooongMarketCoordinatorTest is BaseTest {
         vm.prank(alice);
         vm.expectPartialRevert(LooongMarketCoordinatorV1.TokenSaltAlreadyUsed.selector);
         coordinator.openTokenMarket(args, predicted);
+    }
+
+    function test_forcedClaimsDoNotBlockEitherMarket() public {
+        (address alpha, PoolId alphaPool) = _launchWithOrdering(alice, "Forced Alpha", "FALPHA", 2_000, true);
+        (address beta, PoolId betaPool) = _launchWithOrdering(alice, "Forced Beta", "FBETA", 3_000, false);
+        assertLt(uint160(alpha), uint160(address(weth)));
+        assertGt(uint160(beta), uint160(address(weth)));
+        ForcedWethClaims donor = new ForcedWethClaims(poolManager, IERC20(address(weth)));
+        weth.mint(address(donor), 3);
+        weth.mint(alice, 4 ether);
+        vm.prank(alice);
+        weth.approve(address(router), type(uint256).max);
+
+        // Exercise both external ERC6909 entry points, followed by activity in both pools.
+        donor.donate(address(hook), 1, true);
+        _tradeAndRedeem(alpha, alphaPool, beta, betaPool);
+        _tradeAndRedeem(beta, betaPool, alpha, alphaPool);
+        assertEq(poolManager.balanceOf(address(hook), uint160(address(weth))) - hook.accountedWethClaims(), 1);
+
+        donor.donate(address(hook), 2, false);
+        _tradeAndRedeem(beta, betaPool, alpha, alphaPool);
+        _tradeAndRedeem(alpha, alphaPool, beta, betaPool);
+        assertEq(poolManager.balanceOf(address(hook), uint160(address(weth))) - hook.accountedWethClaims(), 3);
+        assertTrue(hook.claimsAreConserved());
+        assertEq(hook.accountedWethClaims(), 0);
+        vm.prank(beneficiary);
+        vm.expectRevert(LooongHook.ClaimUnavailable.selector);
+        hook.claimBaseFees(alphaPool, beneficiary);
+    }
+
+    function _tradeAndRedeem(address subject, PoolId poolId, address other, PoolId otherPool) private {
+        uint256 otherCustody = IERC20(other).balanceOf(address(hook));
+        uint256 liabilityBefore = hook.totalBaseFeeLiability();
+        vm.prank(alice);
+        uint256 position = router.buy(subject, 1 ether, 1, _priceLimit(subject, true), uint64(block.timestamp));
+        assertEq(PoolId.unwrap(hook.positionPools(position)), PoolId.unwrap(poolId));
+
+        uint256 fees = hook.totalBaseFeeLiability() - liabilityBefore;
+        uint256 recipientBefore = weth.balanceOf(beneficiary);
+        vm.prank(beneficiary);
+        assertEq(hook.claimBaseFees(poolId, beneficiary), fees);
+        assertGt(fees, 0);
+        assertEq(weth.balanceOf(beneficiary) - recipientBefore, fees);
+        assertEq(hook.totalBaseFeeLiability(), liabilityBefore);
+        assertEq(IERC20(other).balanceOf(address(hook)), otherCustody);
+        assertTrue(hook.custodyIsSolvent(poolId));
+        assertTrue(hook.custodyIsSolvent(otherPool));
+    }
+
+    function test_invalidPriceRollsBackTokenAndPoolRegistration() public {
+        LooongMarketCoordinatorV1.LaunchArgs memory args = _args(alice, "Rollback", "BACK", bytes32(uint256(5)));
+        address predicted = coordinator.previewTokenAddress(args);
+        PoolId poolId = router.poolKey(predicted).toId();
+        args.sqrtPriceX96 += 1;
+
+        vm.prank(alice);
+        vm.expectRevert(LooongMarketCoordinatorV1.InvalidLaunch.selector);
+        coordinator.openTokenMarket(args, predicted);
+        assertEq(predicted.code.length, 0);
+        assertFalse(hook.poolIsLive(poolId));
+
+        args.sqrtPriceX96 -= 1;
+        vm.prank(alice);
+        coordinator.openTokenMarket(args, predicted);
+        assertTrue(hook.poolIsLive(poolId));
     }
 
     function test_launchFitsTransactionBudgetAndUnexpectedAddressRollsBack() public {

@@ -11,6 +11,13 @@ checks aggregate product postconditions after receipts. `scenarios/run.ts` owns 
 concurrency, receipts, verifier invocation, and reporting. Replace the seed trade adapter and add the
 verifier before claiming interaction evidence.
 
+The deployment manifest identifies the first market. `scenarios/markets.ts` launches a second
+subject through the same production coordinator, selecting the opposite currency ordering. The
+100 traders alternate between those markets. The verifier checks each position's owner and PoolId,
+reconciles each subject's custody against its positions, and compares actual PoolManager WETH
+claims with accounted liabilities. Both market identities and their position counts appear in
+`reports/devnet.json`. This scenario uses a fresh disposable installation.
+
 The deploy wrapper copies the manifest to the ignored `ui/public/deployment.json`; shutdown removes
 that copy. `devnet-up.sh` uses 100 disposable accounts derived from a public test mnemonic. These
 accounts are localhost-only and must never hold public-network funds.

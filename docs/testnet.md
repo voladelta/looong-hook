@@ -14,10 +14,11 @@ Preparation and broadcast are separate authority boundaries.
 Preparation is complete when the pinned fork proves every included branch and the handoff names the
 user-run command, network, account alias requirement, and remaining authorities.
 
-The script uses the manifest creator as the explicit Foundry broadcaster and derives the router,
-factory and coordinator addresses from that account's pinned fork nonce. It rejects a coordinator
-prediction that differs from `root.expectedCoordinator`. The broadcast account must resolve to the
-same creator, and its nonce must remain unchanged after the final dry run.
+The dry run uses `.token.creator` as its simulation sender. Before reading its nonce or creating a
+contract, the deployment script checks that the active broadcast sender matches that creator. It
+then compares the predicted coordinator with `root.expectedCoordinator` and requires the reviewed,
+nonzero token address. The broadcast account must resolve to the same creator, and its nonce must
+remain unchanged after the final dry run.
 
 ## Broadcast
 

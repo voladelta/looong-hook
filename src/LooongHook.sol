@@ -158,6 +158,7 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
     uint256 public totalBaseFeeLiability;
     uint256 public totalRebateLiability;
     uint256 public totalScaledRewardLiability;
+    uint256 private _accountedWethClaims;
     PoolId private _legacyPoolId;
 
     mapping(PoolId poolId => PoolState state) private _pools;
@@ -427,7 +428,7 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
     }
 
     function accountedWethClaims() public view returns (uint256) {
-        return manager.balanceOf(address(this), uint160(address(weth)));
+        return _accountedWethClaims;
     }
 
     function accountingLiabilityScaled() public view returns (uint256) {
@@ -458,7 +459,8 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
     }
 
     function claimsAreConserved() public view returns (bool) {
-        return accountedWethClaims() * REWARD_PRECISION >= accountingLiabilityScaled();
+        return _accountedWethClaims * REWARD_PRECISION == accountingLiabilityScaled()
+            && manager.balanceOf(address(this), uint160(address(weth))) >= _accountedWethClaims;
     }
 
     // Compatibility reads for the repository's original single-market consumers. New integrations
@@ -505,6 +507,7 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
         if (!_redeeming || keccak256(data) != _expectedRedeemHash) revert InvalidHookData();
         (bytes4 domain, address recipient, uint256 amount) = abi.decode(data, (bytes4, address, uint256));
         if (domain != REDEEM_DOMAIN || recipient == address(0) || amount == 0) revert InvalidHookData();
+        _accountedWethClaims -= amount;
         manager.burn(address(this), uint160(address(weth)), amount);
         manager.take(Currency.wrap(address(weth)), recipient, amount);
         return "";
@@ -846,6 +849,8 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
                 LooongAccounting.previewFee(gross, LooongAccounting.SELL_COMPONENT_RATE, pool.componentFeeRemainder);
             pool.componentFeeRemainder = nextComponentRemainder;
         }
+        // Only protocol-issued claims back liabilities; unsolicited claims remain surplus.
+        _accountedWethClaims += baseFee + componentFee;
         manager.mint(address(this), uint160(address(weth)), baseFee + componentFee);
     }
 
@@ -946,6 +951,8 @@ contract LooongHook is BaseHook, IUnlockCallback, ReentrancyGuard, ILooongHook {
     }
 
     function _assertClaims() private view {
-        if (!claimsAreConserved()) revert AccountingInvariant();
+        if (!claimsAreConserved()) {
+            revert AccountingInvariant();
+        }
     }
 }

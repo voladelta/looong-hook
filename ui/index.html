@@ -27,6 +27,18 @@
         </div>
       </section>
 
+      <section aria-labelledby="market-title">
+        <h2 id="market-title">Selected market</h2>
+        <p>Return to a known market or enter its subject-token address. Each selection is checked on chain and saved in this browser.</p>
+        <form id="market-form">
+          <label for="market-picker">Known markets</label>
+          <select id="market-picker"></select>
+          <label for="market-subject">Another subject-token address</label>
+          <input id="market-subject" type="text" autocomplete="off" placeholder="0x…" />
+          <button id="select-market" type="submit">Select market</button>
+        </form>
+      </section>
+
       <section aria-labelledby="launch-title">
         <h2 id="launch-title">Launch a token with LOOONG</h2>
         <p>The complete fixed supply is created and locked into a new pool under the shared LOOONG hook.</p>

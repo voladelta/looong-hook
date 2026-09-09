@@ -7,7 +7,6 @@ import {
   http,
   keccak256,
   parseAbi,
-  parseEventLogs,
   parseUnits,
   stringToHex,
   type Address,
@@ -15,6 +14,7 @@ import {
 } from "viem";
 
 import "./style.css";
+import { launchedMarketHint, marketStorageKey, openedPositionId, preparePositionAction, prioritizeMarketHints, readMarketHints, resolveMarket, requirePositionMarket, type Market } from "./markets";
 
 interface DeploymentManifest {
   chainId: number;
@@ -40,7 +40,6 @@ declare global {
 }
 
 const hookAbi = parseAbi([
-  "event PositionOpened(bytes32 indexed poolId, uint256 indexed positionId, address indexed owner, uint256 tokens, uint256 wethBasis)",
   "function nextPositionId() view returns (uint256)",
   "function totalCustodiedTokens(bytes32 poolId) view returns (uint256)",
   "function accountedWethClaims() view returns (uint256)",
@@ -67,7 +66,6 @@ const routerAbi = parseAbi([
 const coordinatorAbi = parseAbi([
   "function previewTokenAddress((string name,string symbol,string tagline,string logoURI,address expectedCreator,address feeBeneficiary,bytes32 deploymentSalt,uint160 sqrtPriceX96) args) view returns (address predicted)",
   "function openTokenMarket((string name,string symbol,string tagline,string logoURI,address expectedCreator,address feeBeneficiary,bytes32 deploymentSalt,uint160 sqrtPriceX96) args,address expectedToken) returns (address subject,bytes32 poolId)",
-  "event LooongMarketOpened(address indexed subject, bytes32 indexed poolId, address indexed creator, address feeBeneficiary, uint160 sqrtPriceX96, int24 tickLower, int24 tickUpper, uint256 subjectUsed)",
 ]);
 const minSqrtPrice = 4_295_128_739n;
 const maxSqrtPrice = 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_342n;
@@ -91,6 +89,9 @@ const claimRebateButton = element<HTMLButtonElement>("#claim-rebate");
 const claimRewardsButton = element<HTMLButtonElement>("#claim-rewards");
 const formError = element<HTMLParagraphElement>("#form-error");
 const status = element<HTMLParagraphElement>("#status");
+const marketPicker = element<HTMLSelectElement>("#market-picker");
+const marketForm = element<HTMLFormElement>("#market-form");
+const marketButton = element<HTMLButtonElement>("#select-market");
 
 const response = await fetch("/deployment.json");
 if (!response.ok) throw new Error("The LOOONG deployment manifest is unavailable.");
@@ -102,20 +103,60 @@ const chain = defineChain({
   rpcUrls: { default: { http: [deployment.rpcUrl] } },
 });
 const publicClient = createPublicClient({ chain, transport: http(deployment.rpcUrl) });
-let poolId = deployment.poolId;
-let subject = deployment.contracts.subject;
-const [subjectDecimals, wethDecimals] = await Promise.all([
-  publicClient.readContract({ address: deployment.contracts.subject, abi: erc20Abi, functionName: "decimals" }),
-  publicClient.readContract({ address: deployment.contracts.weth, abi: erc20Abi, functionName: "decimals" }),
-]);
+let selectedMarket = await resolveMarket(publicClient, deployment, deployment.contracts.subject);
+if (selectedMarket.poolId.toLowerCase() !== deployment.poolId.toLowerCase()) throw new Error("The deployment PoolId does not match its subject.");
+let { poolId, subject, decimals: subjectDecimals } = selectedMarket;
+const storageKey = marketStorageKey(deployment);
+let savedHints: ReturnType<typeof readMarketHints> = { subjects: [] };
+try {
+  savedHints = readMarketHints(localStorage.getItem(storageKey));
+} catch {
+  status.textContent = "Browser storage is unavailable. Market choices will last for this session.";
+}
+const knownSubjects = new Set<Address>(prioritizeMarketHints(
+  [subject.toLowerCase() as Address, ...savedHints.subjects],
+  savedHints.selected ?? subject,
+));
+if (savedHints.selected) {
+  try {
+    selectedMarket = await resolveMarket(publicClient, deployment, savedHints.selected);
+    ({ poolId, subject, decimals: subjectDecimals } = selectedMarket);
+  } catch (error) {
+    showError(new Error(`Saved market is unavailable. The deployment market is selected. ${error instanceof Error ? error.message : String(error)}`));
+  }
+}
+renderMarketPicker();
+const wethDecimals = await publicClient.readContract({ address: deployment.contracts.weth, abi: erc20Abi, functionName: "decimals" });
 let account: Address | undefined;
+let working = false;
 
 network.textContent = `${deployment.network} · chain ${deployment.chainId} · 0.30% LP fee`;
 contracts.replaceChildren(...definitionRows(Object.entries(deployment.contracts)));
 await refreshState();
 
-connect.addEventListener("click", async () => {
+marketForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (working) return;
   clearError();
+  setWorking(marketButton, "Select market", true);
+  try {
+    const enteredSubject = element<HTMLInputElement>("#market-subject").value.trim();
+    const market = await resolveMarket(publicClient, deployment, enteredSubject || marketPicker.value);
+    selectMarket(market);
+    await refreshState();
+    status.textContent = `Selected market ${market.subject}.`;
+  } catch (error) {
+    renderMarketPicker();
+    showError(error);
+  } finally {
+    setWorking(marketButton, "Select market", false);
+  }
+});
+
+connect.addEventListener("click", async () => {
+  if (working) return;
+  clearError();
+  setWorking(connect, "Connect wallet", true);
   try {
     const wallet = await connectedWallet();
     [account] = await wallet.requestAddresses();
@@ -125,6 +166,8 @@ connect.addEventListener("click", async () => {
     status.textContent = "Wallet connected. You can open or manage a position.";
   } catch (error) {
     showError(error);
+  } finally {
+    setWorking(connect, "Connect wallet", false);
   }
 });
 
@@ -169,14 +212,16 @@ launchForm.addEventListener("submit", async (event) => {
     });
     const hash = await wallet.writeContract(simulation.request);
     const receipt = await requireReceipt(hash, "The token launch reverted.");
-    const launched = parseEventLogs({
-      abi: coordinatorAbi,
-      logs: receipt.logs,
-      eventName: "LooongMarketOpened",
-    })[0];
-    if (!launched) throw new Error("The launch receipt did not contain a market event.");
-    subject = launched.args.subject;
-    poolId = launched.args.poolId;
+    const launched = launchedMarketHint(receipt, {
+      coordinator: deployment.contracts.coordinator,
+      subject: expectedToken,
+      creator: launchArgs.expectedCreator,
+      feeBeneficiary: launchArgs.feeBeneficiary,
+      sqrtPriceX96: launchArgs.sqrtPriceX96,
+    });
+    const market = await resolveMarket(publicClient, deployment, launched.subject);
+    if (market.poolId.toLowerCase() !== launched.poolId.toLowerCase()) throw new Error("The launch event PoolId does not match the registered market.");
+    selectMarket(market);
     await refreshState();
     status.textContent = `${symbol} launched at ${subject}. It is now the selected LOOONG market.`;
   } catch (error) {
@@ -210,7 +255,7 @@ buyForm.addEventListener("submit", async (event) => {
     });
     if (allowance < amount) {
       status.textContent = "Approve WETH in your wallet.";
-      const approval = await wallet.writeContract({
+      const approvalSimulation = await publicClient.simulateContract({
         account: account!,
         chain,
         address: deployment.contracts.weth,
@@ -218,6 +263,7 @@ buyForm.addEventListener("submit", async (event) => {
         functionName: "approve",
         args: [deployment.contracts.router, amount],
       });
+      const approval = await wallet.writeContract(approvalSimulation.request);
       await requireReceipt(approval, "The WETH approval reverted.");
     }
 
@@ -233,13 +279,14 @@ buyForm.addEventListener("submit", async (event) => {
     status.textContent = "Confirm the verified buy in your wallet.";
     const hash = await wallet.writeContract(simulation.request);
     const receipt = await requireReceipt(hash, "The verified buy reverted.");
-    const opened = parseEventLogs({ abi: hookAbi, logs: receipt.logs, eventName: "PositionOpened" }).find(
-      (eventLog) => eventLog.args.owner.toLowerCase() === account!.toLowerCase(),
-    );
-    if (!opened) throw new Error("The buy receipt did not contain your position event.");
-    positionIdInput.value = opened.args.positionId.toString();
+    const positionId = openedPositionId(receipt, {
+      hook: deployment.contracts.hook,
+      poolId,
+      owner: account!,
+    });
+    positionIdInput.value = positionId.toString();
     await refreshAll();
-    status.textContent = `Position ${opened.args.positionId} opened.`;
+    status.textContent = `Position ${positionId} opened.`;
   } catch (error) {
     showError(error);
   } finally {
@@ -253,12 +300,18 @@ positionForm.addEventListener("submit", async (event) => {
   clearError();
   const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
   if (!submitter) return;
-  const positionId = parsePositionId();
   const action = submitter.value;
   const idleLabel = submitter.textContent ?? "Submit";
   setWorking(submitter, idleLabel, true);
   try {
-    const wallet = await connectedWallet();
+    const positionId = parsePositionId();
+    const wallet = await preparePositionAction(
+      publicClient,
+      deployment,
+      positionId,
+      selectedMarket,
+      connectedWallet,
+    );
     if (action === "activate") {
       const simulation = await publicClient.simulateContract({
         account: account!,
@@ -313,12 +366,16 @@ positionForm.addEventListener("submit", async (event) => {
 });
 
 inspectButton.addEventListener("click", async () => {
+  if (working) return;
   clearError();
+  setWorking(inspectButton, "Inspect", true);
   try {
     await refreshPosition(parsePositionId());
     status.textContent = "Position state refreshed.";
   } catch (error) {
     showError(error);
+  } finally {
+    setWorking(inspectButton, "Inspect", false);
   }
 });
 
@@ -355,6 +412,8 @@ async function connectedWallet() {
   if (!window.ethereum) throw new Error("No injected wallet was found.");
   const wallet = createWalletClient({ chain, transport: custom(window.ethereum) });
   if ((await wallet.getChainId()) !== deployment.chainId) await wallet.switchChain({ id: deployment.chainId });
+  if ((await wallet.getChainId()) !== deployment.chainId) throw new Error("Switch the wallet to the deployment chain.");
+  await resolveMarket(publicClient, deployment, subject);
   return wallet;
 }
 
@@ -365,6 +424,7 @@ async function refreshAll(): Promise<void> {
 }
 
 async function refreshState(): Promise<void> {
+  await resolveMarket(publicClient, deployment, subject);
   const [nextPositionId, custody, claims, custodySolvent, claimsConserved] = await Promise.all([
     publicClient.readContract({ address: deployment.contracts.hook, abi: hookAbi, functionName: "nextPositionId" }),
     publicClient.readContract({
@@ -428,6 +488,7 @@ async function refreshState(): Promise<void> {
 }
 
 async function refreshPosition(positionId: bigint): Promise<void> {
+  await requirePositionMarket(publicClient, deployment, positionId, selectedMarket);
   const position = await publicClient.readContract({
     address: deployment.contracts.hook,
     abi: hookAbi,
@@ -501,17 +562,47 @@ async function requireReceipt(hash: `0x${string}`, message: string) {
 }
 
 function requireAccount(): boolean {
+  if (working) return false;
   if (account) return true;
   status.textContent = "Connect a wallet first.";
   connect.focus();
   return false;
 }
 
-function setWorking(button: HTMLButtonElement, idleLabel: string, working: boolean): void {
-  for (const control of document.querySelectorAll<HTMLButtonElement>(".write-action")) {
-    control.disabled = working;
+function setWorking(button: HTMLButtonElement, idleLabel: string, pending: boolean): void {
+  working = pending;
+  for (const control of document.querySelectorAll<HTMLButtonElement | HTMLInputElement | HTMLSelectElement>("button, input, select")) {
+    control.disabled = pending;
   }
-  button.textContent = working ? `${idleLabel} · Working…` : idleLabel;
+  button.textContent = pending ? `${idleLabel} · Working…` : idleLabel;
+}
+
+function selectMarket(market: Market): void {
+  selectedMarket = market;
+  ({ poolId, subject, decimals: subjectDecimals } = market);
+  const prioritizedSubjects = prioritizeMarketHints(knownSubjects, subject);
+  knownSubjects.clear();
+  for (const knownSubject of prioritizedSubjects) knownSubjects.add(knownSubject);
+  positionState.replaceChildren();
+  walletState.replaceChildren();
+  protocolState.replaceChildren();
+  renderMarketPicker();
+  element<HTMLInputElement>("#market-subject").value = "";
+  try {
+    localStorage.setItem(storageKey, JSON.stringify({ subjects: [...knownSubjects], selected: subject }));
+  } catch {
+    showError(new Error("Market selected, but browser storage is unavailable. Save its subject address before reloading."));
+  }
+}
+
+function renderMarketPicker(): void {
+  marketPicker.replaceChildren(...[...knownSubjects].map((address) => {
+    const option = document.createElement("option");
+    option.value = address;
+    option.textContent = address;
+    option.selected = address === subject.toLowerCase();
+    return option;
+  }));
 }
 
 function definitionRows(entries: [string, string][]): HTMLElement[] {

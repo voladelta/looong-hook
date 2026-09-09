@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { createPublicClient, createWalletClient, defineChain, http } from "viem";
+import { createPublicClient, createWalletClient, defineChain, http, parseAbi, parseEventLogs } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
 
 import { prepareTrade } from "./trade.js";
-import type { DeploymentManifest } from "./types.js";
+import { prepareMarkets } from "./markets.js";
+import type { DeploymentManifest, Market } from "./types.js";
 import { verifyProduct } from "./verify.js";
 
 const root = resolve(import.meta.dirname, "..");
@@ -36,17 +37,29 @@ const chain = defineChain({
   rpcUrls: { default: { http: [manifest.rpcUrl] } },
 });
 const publicClient = createPublicClient({ chain, transport: http(manifest.rpcUrl) });
+const positionOpenedAbi = parseAbi([
+  "event PositionOpened(bytes32 indexed poolId, uint256 indexed positionId, address indexed owner, uint256 tokens, uint256 wethBasis)",
+]);
 
 if (await publicClient.getChainId() !== manifest.chainId) {
   throw new Error("deployment manifest chainId does not match the devnet");
 }
 
+const markets = await prepareMarkets(publicClient, chain, manifest, mnemonicToAccount(mnemonic));
+const firstPositionId = await publicClient.readContract({
+  address: manifest.contracts.hook,
+  abi: parseAbi(["function nextPositionId() view returns (uint256)"]),
+  functionName: "nextPositionId",
+});
+
 interface SuccessfulTransaction {
   index: number;
   address: string;
   hash: string;
+  positionId: string;
   gasLimit: string;
   gasUsed: string;
+  market: Market;
 }
 
 interface FailedTransaction {
@@ -78,9 +91,10 @@ async function worker(): Promise<void> {
 
     const account = mnemonicToAccount(mnemonic, { addressIndex: index });
     const walletClient = createWalletClient({ account, chain, transport: http(manifest.rpcUrl) });
+    const market = markets[index % markets.length];
     let trade;
     try {
-      trade = await prepareTrade({ account, index, manifest, publicClient });
+      trade = await prepareTrade({ account, index, manifest, market, publicClient });
     } catch (error) {
       failures.push({ index, address: account.address, stage: "prepare", error: describeError(error) });
       continue;
@@ -152,12 +166,37 @@ async function worker(): Promise<void> {
       continue;
     }
 
+    const opened = parseEventLogs({
+      abi: positionOpenedAbi,
+      eventName: "PositionOpened",
+      logs: receipt.logs.filter((log) => log.address.toLowerCase() === manifest.contracts.hook.toLowerCase()),
+    });
+    if (
+      opened.length !== 1
+      || opened[0].args.owner.toLowerCase() !== account.address.toLowerCase()
+      || opened[0].args.poolId.toLowerCase() !== market.poolId.toLowerCase()
+      || opened[0].args.positionId === 0n
+      || opened[0].args.tokens === 0n
+      || opened[0].args.wethBasis === 0n
+    ) {
+      failures.push({
+        ...context,
+        hash,
+        gasUsed: receipt.gasUsed.toString(),
+        stage: "receipt",
+        error: "receipt did not contain the expected hook position event",
+      });
+      continue;
+    }
+
     results.push({
       index,
       address: account.address,
       hash,
+      positionId: opened[0].args.positionId.toString(),
       gasLimit: gasLimit.toString(),
       gasUsed: receipt.gasUsed.toString(),
+      market,
     });
   }
 }
@@ -166,8 +205,15 @@ await Promise.all(Array.from({ length: concurrency }, worker));
 results.sort((left, right) => left.index - right.index);
 failures.sort((left, right) => left.index - right.index);
 
-const productVerification =
-  failures.length === 0 ? await verifyProduct(publicClient, manifest, results.map((result) => result.address)) : undefined;
+let productVerification;
+let verificationError: string | undefined;
+if (failures.length === 0) {
+  try {
+    productVerification = await verifyProduct(publicClient, manifest, results, markets, firstPositionId);
+  } catch (error) {
+    verificationError = describeError(error);
+  }
+}
 
 await mkdir(resolve(root, "reports"), { recursive: true });
 await writeFile(
@@ -181,6 +227,7 @@ await writeFile(
       transactions: results,
       failures,
       productVerification,
+      verificationError,
     },
     null,
     2,
@@ -190,5 +237,6 @@ await writeFile(
 if (failures.length > 0) {
   throw new Error(`${failures.length} trader transactions failed; inspect ${reportPath}`);
 }
+if (verificationError) throw new Error(`product verification failed: ${verificationError}; inspect ${reportPath}`);
 
 console.log(`completed ${results.length} trader transactions; report: ${reportPath}`);
