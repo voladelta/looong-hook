@@ -25,6 +25,15 @@ command -v "$cast_bin" >/dev/null 2>&1 || {
     echo "cast is required" >&2
     exit 1
 }
+command -v lsof >/dev/null 2>&1 || {
+    echo "lsof is required to verify devnet listener ownership" >&2
+    exit 1
+}
+
+if [ -n "$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)" ]; then
+    echo "devnet port $port already has a listener" >&2
+    exit 1
+fi
 
 mkdir -p -- "$state"
 if [ -f "$pid_file" ] && kill -0 "$(sed -n '1p' "$pid_file")" 2>/dev/null; then
@@ -75,7 +84,31 @@ fi
 
 rpc_url="http://127.0.0.1:$port"
 attempt=0
-while ! "$cast_bin" chain-id --rpc-url "$rpc_url" >/dev/null 2>&1; do
+while :; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "anvil exited during startup; inspect $log_file" >&2
+        exit 1
+    fi
+
+    listener=$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+    if [ -n "$listener" ] && [ "$listener" != "$pid" ]; then
+        echo "devnet listener is not owned by anvil PID $pid" >&2
+        exit 1
+    fi
+    if [ "$listener" = "$pid" ]; then
+        actual_chain=$("$cast_bin" chain-id --rpc-url "$rpc_url" 2>/dev/null || true)
+        if [ -n "$actual_chain" ] && [ "$actual_chain" != "$chain_id" ]; then
+            echo "devnet chain ID is $actual_chain, expected $chain_id" >&2
+            exit 1
+        fi
+        if [ "$actual_chain" = "$chain_id" ] && kill -0 "$pid" 2>/dev/null \
+            && [ "$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)" = "$pid" ] \
+            && [ "$(sed -n '1p' "$pid_file")" = "$pid" ] \
+            && [ "$(sed -n '1p' "$owner_file")" = "$owner_token" ]; then
+            break
+        fi
+    fi
+
     attempt=$((attempt + 1))
     if [ "$attempt" -ge "$ready_attempts" ]; then
         echo "anvil did not become ready; inspect $log_file" >&2

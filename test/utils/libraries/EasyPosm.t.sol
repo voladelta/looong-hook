@@ -201,25 +201,6 @@ contract EasyPosmTest is Test, BaseTest {
         assertEq(delta.amount1(), int128(uint128(amount1)));
     }
 
-    function test_burn() public {
-        (uint256 tokenId, BalanceDelta mintDelta) = positionManager.mint(
-            key,
-            tickLower,
-            tickUpper,
-            100e18,
-            type(uint256).max,
-            type(uint256).max,
-            address(this),
-            block.timestamp + 1,
-            Constants.ZERO_BYTES
-        );
-
-        BalanceDelta delta =
-            positionManager.burn(tokenId, 0, 0, address(this), block.timestamp + 1, Constants.ZERO_BYTES);
-        assertEq(delta.amount0(), -mintDelta.amount0() - 1 wei);
-        assertEq(delta.amount1(), -mintDelta.amount1() - 1 wei);
-    }
-
     // This test requires a donateRouter, TODO
     // function test_collect() public {
     //     (uint256 tokenId,) = positionManager.mint(

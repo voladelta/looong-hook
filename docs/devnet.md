@@ -49,7 +49,9 @@ orchestration, advance the localhost chain through RPC, then broadcast activatio
 `vm.warp` inside one multi-transaction broadcast script changes simulation state but does not prove
 the mined ordering that the production transition requires.
 
-The wrapper binds its Anvil process with a unique ownership token and cleanup traps. A failed
+The wrapper binds its Anvil process with a unique ownership token and cleanup traps.
+Startup rejects occupied ports and requires `lsof` to confirm that the spawned, live PID owns the
+listener. Readiness also requires the configured RPC chain ID and matching ownership records. A failed
 scenario transaction or report must preserve the stage, selector, value, gas limit, transaction
 hash, gas used, and post-receipt replay error when available in `reports/`.
 

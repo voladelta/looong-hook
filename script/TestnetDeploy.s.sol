@@ -58,16 +58,18 @@ contract TestnetDeployScript is Script {
         config.beneficiary = vm.parseJsonAddress(json, ".feeBeneficiary");
         config.hookSalt = vm.parseJsonBytes32(json, ".root.hookSalt");
         config.expectedCoordinator = vm.parseJsonAddress(json, ".root.expectedCoordinator");
-        config.sqrtPriceX96 = uint160(vm.parseJsonUint(json, ".launch.sqrtPriceX96"));
+        uint256 sqrtPriceX96 = vm.parseJsonUint(json, ".launch.sqrtPriceX96");
         config.creator = vm.parseJsonAddress(json, ".token.creator");
         config.expectedToken = vm.parseJsonAddress(json, ".token.expectedAddress");
         if (
             chainId != block.chainid || address(config.manager) == address(0) || address(config.weth) == address(0)
                 || config.beneficiary == address(0) || config.expectedCoordinator == address(0)
                 || config.creator == address(0) || config.expectedToken == address(0)
-                || config.sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE || config.sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE
+                || sqrtPriceX96 <= TickMath.MIN_SQRT_PRICE || sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE
                 || address(config.manager).code.length == 0 || address(config.weth).code.length == 0
         ) revert InvalidManifest();
+
+        config.sqrtPriceX96 = uint160(sqrtPriceX96);
     }
 
     function _launchArgs(string memory json, DeploymentConfig memory config)

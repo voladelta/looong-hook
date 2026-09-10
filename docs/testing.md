@@ -30,6 +30,14 @@ Compute fees, gross-up, splits, and carried remainders in an independent test or
 between documented examples so early integer flooring cannot hide. A nonzero-fee assertion is not
 accounting proof.
 
+`PoolSwapFeeOracle.sol` derives fees from lifetime gross notionals and executed PoolManager `Swap`
+events. It checks token movements, fee liabilities, minted claims, and carried rounding through an
+independent gross solver. The coordinator suite fuzzes all four quadrants in both currency
+orderings with distinct payers and recipients. The legacy integration suite also checks fractional
+early-profit splits, carried profit remainders and the eligible holder's eventual reward payment.
+The multi-market invariant uses these independent fee totals for its claim entitlements and
+interleaves full sells and withdrawals with subsequent actions.
+
 The swap matrix is complete when every supported quadrant passes through the real router and
 PoolManager, and each hostile or partial-fill case rolls back all affected state.
 
@@ -79,3 +87,7 @@ follow `docs/gas.md` and keep its maximum-bound production-path test in the ordi
 
 Verification is complete when focused proof and every applicable full-gate stage are green, the
 sentinel is present, and the final source has not changed since those commands ran.
+
+The embedded testkit runtime has recorded provenance, but bytecode equivalence with the source
+revisions in `vendor.lock.json` has not been established. Passing these gates demonstrates behavior
+against the embedded fixtures; it does not establish that additional provenance claim.

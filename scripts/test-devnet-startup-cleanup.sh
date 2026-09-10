@@ -7,6 +7,8 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/v4hook-devnet-cleanup.XXXXXX")
 signal_state="$tmp/signal-state"
 failure_state="$tmp/failure-state"
 preexisting_state="$tmp/preexisting-state"
+occupied_state="$tmp/occupied-state"
+probe_state="$tmp/probe-state"
 signal_ui="$tmp/signal-ui/deployment.json"
 failure_ui="$tmp/failure-ui/deployment.json"
 preexisting_ui="$tmp/preexisting-ui/deployment.json"
@@ -16,7 +18,7 @@ failure_port=$((port_base + 1))
 preexisting_port=$((port_base + 2))
 
 cleanup() {
-    for state in "$signal_state" "$failure_state" "$preexisting_state"; do
+    for state in "$signal_state" "$failure_state" "$preexisting_state" "$occupied_state" "$probe_state"; do
         if [ -f "$state/anvil.pid" ]; then
             pid=$(sed -n '1p' "$state/anvil.pid")
             kill "$pid" 2>/dev/null || true
@@ -112,8 +114,49 @@ cast chain-id --rpc-url "http://127.0.0.1:$preexisting_port" >/dev/null 2>&1 || 
 }
 [ -f "$preexisting_ui" ] || { echo "pre-existing manifest was removed" >&2; exit 1; }
 ! grep -q 'DEVNET_OK' "$preexisting_output" || { echo "false pre-existing DEVNET_OK sentinel" >&2; exit 1; }
+
+# A node with a different state directory must also prevent startup, even on the expected chain.
+occupied_status=0
+DEVNET_STATE_DIR="$occupied_state" DEVNET_PORT="$preexisting_port" \
+    "$root/scripts/devnet-up.sh" >"$tmp/occupied.out" 2>&1 || occupied_status=$?
+[ "$occupied_status" = "1" ] || { echo "occupied port was accepted" >&2; exit 1; }
+grep -q 'port .* already has a listener' "$tmp/occupied.out"
+kill -0 "$preexisting_pid"
+[ ! -e "$occupied_state/anvil.pid" ]
+[ ! -e "$occupied_state/config.env" ]
+
 DEVNET_STATE_DIR="$preexisting_state" DEVNET_UI_MANIFEST="$preexisting_ui" \
     DEVNET_OWNER_TOKEN=preexisting "$root/scripts/devnet-down.sh" >>"$preexisting_output" 2>&1
 assert_stopped "$preexisting_state" "$preexisting_output" "$preexisting_pid" "$preexisting_port" "$preexisting_ui"
+
+# Stub only the external process/RPC boundary; exercise the actual startup script.
+cat >"$tmp/rpc-chain" <<'EOF'
+#!/bin/sh
+echo "${TEST_RPC_CHAIN:-31337}"
+EOF
+cat >"$tmp/idle-anvil" <<'EOF'
+#!/bin/sh
+exec sleep 30
+EOF
+chmod +x "$tmp/rpc-chain" "$tmp/idle-anvil"
+
+for probe in dead wrong-chain no-listener; do
+    probe_status=0
+    probe_anvil=anvil
+    probe_chain=31337
+    case "$probe" in
+        dead) probe_anvil=false ;;
+        wrong-chain) probe_chain=1 ;;
+        no-listener) probe_anvil="$tmp/idle-anvil" ;;
+    esac
+    TEST_RPC_CHAIN="$probe_chain" DEVNET_STATE_DIR="$probe_state" DEVNET_PORT="$failure_port" \
+        DEVNET_ANVIL_BIN="$probe_anvil" DEVNET_CAST_BIN="$tmp/rpc-chain" DEVNET_READY_ATTEMPTS=10 \
+        "$root/scripts/devnet-up.sh" >"$tmp/$probe.out" 2>&1 || probe_status=$?
+    [ "$probe_status" = "1" ] || { echo "$probe readiness was accepted" >&2; exit 1; }
+    [ ! -e "$probe_state/anvil.pid" ]
+    [ ! -e "$probe_state/anvil.owner" ]
+    [ ! -e "$probe_state/config.env" ]
+    [ -z "$(lsof -nP -tiTCP:"$failure_port" -sTCP:LISTEN 2>/dev/null || true)" ]
+done
 
 echo "DEVNET_STARTUP_CLEANUP_OK"

@@ -5,6 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
+import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
@@ -15,9 +19,11 @@ import {LooongRouter} from "../../src/LooongRouter.sol";
 import {LooongTokenV1} from "../../src/LooongTokenV1.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {ForcedWethClaims} from "../utils/ForcedWethClaims.sol";
+import {PoolSwapFeeOracle} from "../utils/PoolSwapFeeOracle.sol";
 
-contract LooongMarketCoordinatorTest is BaseTest {
+contract LooongMarketCoordinatorTest is BaseTest, PoolSwapFeeOracle {
     using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     uint256 private constant MAX_TRANSACTION_GAS = 12_000_000;
 
@@ -113,10 +119,16 @@ contract LooongMarketCoordinatorTest is BaseTest {
 
     function test_launchRejectsCreatorSubstitutionAndSaltReplay() public {
         LooongMarketCoordinatorV1.LaunchArgs memory args = _args(alice, "Alpha", "ALPHA", bytes32(uint256(3)));
-        vm.expectRevert(LooongMarketCoordinatorV1.InvalidLaunch.selector);
-        coordinator.openTokenMarket(args, address(0));
-
         address predicted = coordinator.previewTokenAddress(args);
+        PoolId pool = router.poolKey(predicted).toId();
+
+        vm.expectRevert(LooongMarketCoordinatorV1.InvalidLaunch.selector);
+        coordinator.openTokenMarket(args, predicted);
+        assertEq(predicted.code.length, 0);
+        assertFalse(hook.poolIsLive(pool));
+        (uint160 price,,,) = poolManager.getSlot0(pool);
+        assertEq(price, 0);
+
         vm.prank(alice);
         vm.expectRevert(LooongMarketCoordinatorV1.InvalidLaunch.selector);
         coordinator.openTokenMarket(args, address(0));
@@ -127,6 +139,108 @@ contract LooongMarketCoordinatorTest is BaseTest {
         vm.prank(alice);
         vm.expectPartialRevert(LooongMarketCoordinatorV1.TokenSaltAlreadyUsed.selector);
         coordinator.openTokenMarket(args, predicted);
+    }
+
+    function test_foundingSupplyBandAndLiquidityOwnerInBothOrderings() public {
+        for (uint256 ordering; ordering < 2; ++ordering) {
+            (address subject, PoolId pool) = _launchWithOrdering(alice, "Founding", "FOUND", 10_000, ordering == 0);
+            bool subjectFirst = subject < address(weth);
+            int24 lower = subjectFirst ? int24(0) : int24(-207_000);
+            int24 upper = subjectFirst ? int24(207_000) : int24(0);
+            uint256 supply = 1_000_000_000 ether;
+            uint160 lowerPrice = TickMath.getSqrtPriceAtTick(lower);
+            uint160 upperPrice = TickMath.getSqrtPriceAtTick(upper);
+            uint128 liquidity = subjectFirst
+                ? LiquidityAmounts.getLiquidityForAmount0(lowerPrice, upperPrice, supply)
+                : LiquidityAmounts.getLiquidityForAmount1(lowerPrice, upperPrice, supply);
+            bytes32 ownedPosition = Position.calculatePositionKey(address(coordinator), lower, upper, bytes32(0));
+
+            assertEq(IERC20(subject).totalSupply(), supply);
+            assertEq(poolManager.getPositionLiquidity(pool, ownedPosition), liquidity, "founding owner/band/liquidity");
+            assertEq(
+                poolManager.getPositionLiquidity(pool, Position.calculatePositionKey(alice, lower, upper, bytes32(0))),
+                0
+            );
+            (uint160 price, int24 tick,, uint24 lpFee) = poolManager.getSlot0(pool);
+            assertEq(price, uint160(1 << 96));
+            assertEq(tick, 0);
+            assertEq(lpFee, 3_000);
+            assertEq(IERC20(subject).balanceOf(alice), 0);
+            assertEq(IERC20(subject).balanceOf(address(coordinator)), 0);
+            assertEq(IERC20(subject).balanceOf(address(hook)), 0);
+            assertEq(weth.balanceOf(address(poolManager)), 0, "founding band used WETH");
+            assertEq(
+                IERC20(subject).balanceOf(address(poolManager)) + IERC20(subject).balanceOf(address(0xdead)), supply
+            );
+            assertGt(IERC20(subject).balanceOf(address(poolManager)), 0);
+        }
+    }
+
+    function testFuzz_independentFeesAcrossQuadrantsAndOrderings(uint64 amountSeed) public {
+        weth.mint(address(this), 10 ether);
+        weth.approve(address(router), type(uint256).max);
+        for (uint256 ordering; ordering < 2; ++ordering) {
+            (address subject, PoolId pool) = _launchWithOrdering(alice, "Fee oracle", "FEE", 20_000, ordering == 0);
+            vm.prank(bob);
+            IERC20(subject).approve(address(router), type(uint256).max);
+            for (uint256 round; round < 3; ++round) {
+                uint128 amount = uint128(0.1 ether + uint256(amountSeed) % 0.1 ether + round * 1_003);
+                _ordinaryFeeSwap(subject, pool, true, false, amount);
+                _ordinaryFeeSwap(subject, pool, false, false, uint128(IERC20(subject).balanceOf(bob) / 7));
+                _ordinaryFeeSwap(subject, pool, true, true, amount / 100);
+                _ordinaryFeeSwap(subject, pool, false, true, amount / 1_000);
+            }
+            uint256 beforeClaim = weth.balanceOf(beneficiary);
+            vm.prank(beneficiary);
+            assertEq(hook.claimBaseFees(pool, beneficiary), feeTotals[pool].unclaimedBase);
+            assertEq(weth.balanceOf(beneficiary) - beforeClaim, feeTotals[pool].unclaimedBase);
+            for (uint256 net = 1_000; net < 1_010; ++net) {
+                _assertFeeRemainders(hook, pool, net);
+            }
+            if (ordering == 0) {
+                assertEq(hook.baseFeeRemainder(), feeTotals[pool].gross % 1_000 * 1_000);
+                assertEq(hook.componentFeeRemainder(), feeTotals[pool].soldGross * 29 % 1_000 * 1_000);
+            }
+        }
+    }
+
+    function _ordinaryFeeSwap(address subject, PoolId pool, bool buy, bool exactOutput, uint128 amount) private {
+        FeeObservation memory beforeSwap = _observeFees(hook, subject, buy ? address(this) : alice, bob);
+        uint256 result = _executeOrdinarySwap(subject, pool, buy, exactOutput, amount);
+
+        SwapFees memory expected = _assertSwapFees(hook, router.poolKey(subject), buy, beforeSwap);
+        uint256 input = buy ? expected.gross : expected.subjectAmount;
+        uint256 output = buy ? expected.subjectAmount : expected.gross - expected.base - expected.component;
+        assertEq(exactOutput ? output : input, amount, "specified amount");
+        assertEq(result, exactOutput ? input : output, "router result");
+        assertEq(hook.totalScaledRewardLiability() - beforeSwap.rewardLiability, expected.component * 1e27);
+        _assertFeeRemainders(hook, pool, 10_003);
+    }
+
+    function _executeOrdinarySwap(address subject, PoolId pool, bool buy, bool exactOutput, uint128 amount)
+        private
+        returns (uint256)
+    {
+        if (exactOutput) {
+            bytes memory witness =
+                buy ? bytes("") : abi.encode(hook.WITNESS_DOMAIN(), _expectedGross(pool, amount, true));
+            vm.prank(buy ? address(this) : bob);
+            return router.swapExactOutput(
+                subject,
+                buy,
+                amount,
+                1 ether,
+                buy ? bob : alice,
+                _priceLimit(subject, buy),
+                uint64(block.timestamp),
+                witness
+            );
+        } else {
+            vm.prank(buy ? address(this) : bob);
+            return router.swapExactInput(
+                subject, buy, amount, 1, buy ? bob : alice, _priceLimit(subject, buy), uint64(block.timestamp)
+            );
+        }
     }
 
     function test_forcedClaimsDoNotBlockEitherMarket() public {

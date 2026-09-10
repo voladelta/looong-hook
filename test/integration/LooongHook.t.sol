@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
-import {Pool} from "@uniswap/v4-core/src/libraries/Pool.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -26,6 +25,7 @@ import {LooongHookFactory} from "../../src/LooongHookFactory.sol";
 import {LooongRouter} from "../../src/LooongRouter.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {LooongLaunchV1} from "../utils/LooongExistingTokenFixture.sol";
+import {PoolSwapFeeOracle} from "../utils/PoolSwapFeeOracle.sol";
 
 contract LooongDonationRouter is IUnlockCallback {
     using SafeERC20 for IERC20;
@@ -63,7 +63,7 @@ contract LooongDonationRouter is IUnlockCallback {
     }
 }
 
-contract LooongHookIntegrationTest is BaseTest {
+contract LooongHookIntegrationTest is BaseTest, PoolSwapFeeOracle {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
@@ -77,6 +77,14 @@ contract LooongHookIntegrationTest is BaseTest {
     address private alice = makeAddr("alice");
     address private bob = makeAddr("bob");
     address private beneficiary = makeAddr("beneficiary");
+
+    struct EarlyExitOracle {
+        uint256 remainingBasis;
+        uint128 remainingTokens;
+        uint256 openedAt;
+        uint256 profitRemainder;
+        uint256 rewards;
+    }
 
     function setUp() public {
         deployArtifactsAndLabel();
@@ -369,6 +377,72 @@ contract LooongHookIntegrationTest is BaseTest {
         _assertConservation();
     }
 
+    function testFuzz_earlyProfitSplitAndRemainderFromExecutedDeltas(uint32 elapsedSeed) public {
+        weth.mint(bob, 3 ether);
+        vm.prank(bob);
+        weth.approve(address(router), type(uint256).max);
+        uint256 aliceMature = _oracleBuy(alice, 2 ether);
+        uint256 bobMature = _oracleBuy(bob, 2 ether);
+        vm.warp(block.timestamp + 30 days);
+        hook.activatePosition(aliceMature);
+        hook.activatePosition(bobMature);
+
+        uint256 fresh = _oracleBuy(alice, 1 ether);
+        (, uint128 tokens,,) = _position(fresh);
+        EarlyExitOracle memory oracle = EarlyExitOracle(1 ether, tokens, block.timestamp, 0, 0);
+        FeeObservation memory beforePump = _observeFees(hook, address(looong), address(this), address(this));
+        router.swapExactInput(true, 20 ether, 1, address(this), _priceLimit(true), uint64(block.timestamp));
+        _assertSwapFees(hook, key, true, beforePump);
+
+        vm.warp(block.timestamp + bound(elapsedSeed, 1 days, 20 days));
+        for (uint256 i; i < 3; ++i) {
+            _assertEarlyProfitSell(fresh, oracle.remainingTokens / 7 + uint128(i), oracle);
+            vm.warp(block.timestamp + 1_003);
+        }
+
+        uint256 bobShares = hook.ownerShares(bob);
+        uint256 expectedPayment = (oracle.rewards * 1e27 / bobShares) * bobShares / 1e27;
+        uint256 beforeClaim = weth.balanceOf(bob);
+        vm.prank(bob);
+        assertEq(hook.claimRewards(key.toId(), bob), expectedPayment);
+        assertEq(weth.balanceOf(bob) - beforeClaim, expectedPayment);
+        vm.prank(alice);
+        vm.expectRevert(LooongHook.ClaimUnavailable.selector);
+        hook.claimRewards(key.toId(), alice);
+        _assertConservation();
+    }
+
+    function _oracleBuy(address owner, uint128 amount) private returns (uint256 id) {
+        FeeObservation memory beforeSwap = _observeFees(hook, address(looong), owner, address(hook));
+        vm.prank(owner);
+        id = router.buy(amount, 1, _priceLimit(true), uint64(block.timestamp));
+        _assertSwapFees(hook, key, true, beforeSwap);
+    }
+
+    function _assertEarlyProfitSell(uint256 id, uint128 amount, EarlyExitOracle memory oracle) private {
+        uint256 basis = oracle.remainingBasis * amount / oracle.remainingTokens;
+        FeeObservation memory beforeSwap = _observeFees(hook, address(looong), alice, address(hook));
+        vm.prank(alice);
+        router.sell(id, amount, 1, _priceLimit(false), uint64(block.timestamp));
+        SwapFees memory fees = _assertSwapFees(hook, key, false, beforeSwap);
+
+        uint256 profit = fees.gross > fees.base + basis ? fees.gross - fees.base - basis : 0;
+        uint256 numerator = profit * 3 * (oracle.openedAt + 30 days - block.timestamp) + oracle.profitRemainder;
+        uint256 reward = numerator / (10 * 30 days);
+        oracle.profitRemainder = numerator % (10 * 30 days);
+        assertGt(reward, 0, "profitable early exit required");
+        assertLt(reward, fees.component, "exercise fractional split below the component cap");
+        assertEq(hook.totalRebateLiability() - beforeSwap.rebateLiability, fees.component - reward);
+        assertEq(hook.totalScaledRewardLiability() - beforeSwap.rewardLiability, reward * 1e27);
+        (,,,, uint128 remaining,,,, uint256 remainingBasis,,, uint256 remainder) = hook.positions(id);
+        oracle.remainingBasis -= basis;
+        oracle.remainingTokens -= amount;
+        oracle.rewards += reward;
+        assertEq(remainingBasis, oracle.remainingBasis);
+        assertEq(remaining, oracle.remainingTokens);
+        assertEq(remainder, oracle.profitRemainder * 1_000, "profit remainder units");
+    }
+
     function test_staleForgedAndExactInputWitnessesRevertWithoutAccountingChange() public {
         uint256 netWeth = 10_003;
         uint256 staleGross = hook.quoteExactOutputGross(netWeth, true);
@@ -411,11 +485,34 @@ contract LooongHookIntegrationTest is BaseTest {
     function test_verifiedPartialFillAndDirectCallbackCallsRollback() public {
         uint256 nextPositionBefore = hook.nextPositionId();
         uint256 aliceWethBefore = weth.balanceOf(alice);
-        vm.expectPartialRevert(Pool.PriceLimitAlreadyExceeded.selector);
+        uint256 claimsBefore = hook.accountedWethClaims();
+        uint256 nonceBefore = hook.ownerNonces(key.toId(), alice);
+        bool zeroForOne = address(weth) < address(looong);
+        uint160 limit = TickMath.getSqrtPriceAtTick(zeroForOne ? int24(-1) : int24(1));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CustomRevert.WrappedError.selector,
+                address(hook),
+                hook.afterSwap.selector,
+                abi.encodeWithSelector(LooongHook.PartialFill.selector),
+                abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+            )
+        );
         vm.prank(alice);
-        router.buy(1 ether, 1, Constants.SQRT_PRICE_1_1, uint64(block.timestamp));
+        router.buy(1 ether, 1, limit, uint64(block.timestamp));
         assertEq(hook.nextPositionId(), nextPositionBefore);
         assertEq(weth.balanceOf(alice), aliceWethBefore);
+        assertEq(hook.ownerNonces(key.toId(), alice), nonceBefore);
+        assertEq(hook.accountedWethClaims(), claimsBefore);
+        assertEq(hook.baseFeeRemainder(), 0);
+        assertEq(hook.totalCustodiedTokens(), 0);
+        assertEq(looong.balanceOf(address(hook)), 0);
+        (uint160 price,,,) = poolManager.getSlot0(key.toId());
+        assertEq(price, Constants.SQRT_PRICE_1_1);
+
+        // The same buy with a nonbinding limit succeeds after the rollback.
+        vm.prank(alice);
+        assertEq(router.buy(1 ether, 1, _priceLimit(true), uint64(block.timestamp)), nextPositionBefore);
 
         vm.expectRevert(ImmutableState.NotPoolManager.selector);
         hook.beforeSwap(

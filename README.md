@@ -47,10 +47,20 @@ orderings through the coordinator, runs the trades across both pools, verifies p
 conservation, and writes `reports/devnet.json`. It prints `DEVNET_OK`
 only after all steps pass.
 
-Run the dapp against the generated devnet manifest:
+The check shuts Anvil down and removes the browser manifest when it finishes. For a live dapp,
+start a separate local session and leave Anvil running:
 
 ```sh
+./scripts/devnet-up.sh
+./scripts/devnet-deploy.sh
 bun run ui:dev
+```
+
+Open the Vite URL and connect a disposable local wallet to chain 31337. When finished, stop Vite
+with Ctrl-C, then shut down Anvil explicitly:
+
+```sh
+./scripts/devnet-down.sh
 ```
 
 The dapp reads `ui/public/deployment.json`. Use `ui/public/deployment.example.json` as the manifest

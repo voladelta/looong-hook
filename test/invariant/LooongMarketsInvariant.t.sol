@@ -17,13 +17,14 @@ import {LooongRouter} from "../../src/LooongRouter.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {ForcedWethClaims} from "../utils/ForcedWethClaims.sol";
 import {InvariantActionAccounting} from "../utils/InvariantActionAccounting.sol";
+import {PoolSwapFeeOracle} from "../utils/PoolSwapFeeOracle.sol";
 
-contract LooongMarketsHandler is InvariantActionAccounting {
+contract LooongMarketsHandler is InvariantActionAccounting, PoolSwapFeeOracle {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
     // Position and swap matrix, three claims, wrong pool, and both unsolicited-claim entry paths.
-    uint256 private constant MODES = 14;
+    uint256 private constant MODES = 16;
 
     struct OutputBalance {
         IERC20 token;
@@ -39,7 +40,7 @@ contract LooongMarketsHandler is InvariantActionAccounting {
     ForcedWethClaims private immutable donor;
     uint256 public forcedClaims;
     uint256[][2] private positions;
-    uint256[2] private baseFeesByMarket;
+    uint256[][2] private closedPositions;
 
     constructor(LooongMarketCoordinatorV1 coordinator, MockERC20 weth_, address[2] memory subjects_) {
         hook = coordinator.hook();
@@ -70,7 +71,6 @@ contract LooongMarketsHandler is InvariantActionAccounting {
         uint256 mode = modeSeed % MODES;
         bytes4 actionId = bytes4(uint32(1 + market * MODES + mode));
         bytes32 otherBefore = _poolFingerprint(1 - market);
-        uint256 baseFeesBefore = hook.totalBaseFeeLiability();
         _beginAction(actionId);
 
         try this.perform(market, mode, amountSeed) {
@@ -86,12 +86,6 @@ contract LooongMarketsHandler is InvariantActionAccounting {
             }
         }
 
-        // Attribute the observed global fee change to the market that executed the action.
-        // A later pool-scoped claim must pay exactly this independent running entitlement.
-        uint256 baseFeesAfter = hook.totalBaseFeeLiability();
-        if (baseFeesAfter >= baseFeesBefore) baseFeesByMarket[market] += baseFeesAfter - baseFeesBefore;
-        else baseFeesByMarket[market] -= baseFeesBefore - baseFeesAfter;
-
         assertEq(_poolFingerprint(1 - market), otherBefore, "other market changed");
         assertConservation();
     }
@@ -100,12 +94,8 @@ contract LooongMarketsHandler is InvariantActionAccounting {
     function perform(uint256 market, uint256 mode, uint256 amountSeed) external {
         require(msg.sender == address(this), "handler only");
         if (mode == 0) {
-            uint128 amount = uint128(bound(amountSeed, 0.01 ether, 0.02 ether));
-            uint256 id = router.buy(subjects[market], amount, 1, _limit(market, true), uint64(block.timestamp));
-            positions[market].push(id);
-            (,,,,,,, uint256 basis,,,,) = hook.positions(id);
-            assertEq(basis, amount, "buy basis differs from payment");
-        } else if (mode <= 3 || mode == 11) {
+            _buyPosition(market, amountSeed);
+        } else if (mode <= 3 || mode == 11 || mode >= 14) {
             _positionAction(market, mode, amountSeed);
         } else if (mode <= 7) {
             _swapAction(market, mode, amountSeed);
@@ -116,14 +106,27 @@ contract LooongMarketsHandler is InvariantActionAccounting {
         }
     }
 
+    function _buyPosition(uint256 market, uint256 amountSeed) private {
+        uint128 amount = uint128(bound(amountSeed, 0.01 ether, 0.02 ether));
+        FeeObservation memory beforeSwap = _observeFees(hook, subjects[market], address(this), address(hook));
+        uint256 id = router.buy(subjects[market], amount, 1, _limit(market, true), uint64(block.timestamp));
+        positions[market].push(id);
+
+        _assertSwapFees(hook, router.poolKey(subjects[market]), true, beforeSwap);
+        (,,,,,,, uint256 basis,,,,) = hook.positions(id);
+        assertEq(basis, amount, "buy basis differs from payment");
+    }
+
     function _positionAction(uint256 market, uint256 mode, uint256 amountSeed) private {
         address subject = subjects[market];
-        uint256 id = positions[market][amountSeed % positions[market].length];
+        if (positions[market].length == 0) _buyPosition(market, amountSeed);
+        uint256 index = amountSeed % positions[market].length;
+        uint256 id = positions[market][index];
         (, uint64 openedAt,,, uint128 remaining,,,,,,,) = hook.positions(id);
-        uint128 amount = remaining / 32;
-        if (mode == 1) {
-            router.sell(subject, id, amount, 1, _limit(market, false), uint64(block.timestamp));
-        } else if (mode == 2) {
+        uint128 amount = mode >= 14 ? remaining : remaining / 32;
+        if (mode == 1 || mode == 14) {
+            _sellPosition(market, id, amount);
+        } else if (mode == 2 || mode == 15) {
             uint256 beforeBalance = IERC20(subject).balanceOf(address(this));
             hook.withdraw(id, amount);
             assertEq(IERC20(subject).balanceOf(address(this)) - beforeBalance, amount);
@@ -134,11 +137,28 @@ contract LooongMarketsHandler is InvariantActionAccounting {
         } else {
             router.sell(subjects[1 - market], id, amount, 1, _limit(1 - market, false), uint64(block.timestamp));
         }
+
+        if (mode >= 14) {
+            closedPositions[market].push(id);
+            positions[market][index] = positions[market][positions[market].length - 1];
+            positions[market].pop();
+        }
+    }
+
+    function _sellPosition(uint256 market, uint256 id, uint128 amount) private {
+        address subject = subjects[market];
+        FeeObservation memory beforeSwap = _observeFees(hook, subject, address(this), address(hook));
+        router.sell(subject, id, amount, 1, _limit(market, false), uint64(block.timestamp));
+        SwapFees memory expected = _assertSwapFees(hook, router.poolKey(subject), false, beforeSwap);
+        assertEq(expected.subjectAmount, amount);
+        // This handler owns every reward share; its verified exits rebate the full component.
+        assertEq(hook.totalRebateLiability() - beforeSwap.rebateLiability, expected.component);
     }
 
     function _swapAction(uint256 market, uint256 mode, uint256 amountSeed) private {
         address subject = subjects[market];
         bool buy = mode == 4 || mode == 6;
+        FeeObservation memory beforeSwap = _observeFees(hook, subject, address(this), address(this));
         if (mode <= 5) {
             uint128 input = buy
                 ? uint128(bound(amountSeed, 0.01 ether, 0.02 ether))
@@ -150,12 +170,14 @@ contract LooongMarketsHandler is InvariantActionAccounting {
         } else {
             _exactOutput(market, buy, uint128(bound(amountSeed, 1e10, 1e11)));
         }
+
+        SwapFees memory expected = _assertSwapFees(hook, router.poolKey(subject), buy, beforeSwap);
+        assertEq(hook.totalScaledRewardLiability() - beforeSwap.rewardLiability, expected.component * 1e27);
     }
 
     function _exactOutput(uint256 market, bool buy, uint128 output) private {
-        bytes memory witness = buy
-            ? bytes("")
-            : abi.encode(hook.WITNESS_DOMAIN(), hook.quoteExactOutputGross(pools[market], output, true));
+        bytes memory witness =
+            buy ? bytes("") : abi.encode(hook.WITNESS_DOMAIN(), _expectedGross(pools[market], output, true));
         OutputBalance memory balance;
         balance.token = buy ? IERC20(subjects[market]) : IERC20(address(weth));
         balance.beforeSwap = balance.token.balanceOf(address(this));
@@ -175,7 +197,8 @@ contract LooongMarketsHandler is InvariantActionAccounting {
         if (mode == 8) {
             vm.prank(beneficiary);
             claimed = hook.claimBaseFees(pool, recipient);
-            assertEq(claimed, baseFeesByMarket[market], "base fees paid from wrong market");
+            assertEq(claimed, feeTotals[pool].unclaimedBase, "base fees paid from wrong market");
+            feeTotals[pool].unclaimedBase = 0;
         } else if (mode == 9) {
             claimed = hook.claimRebate(pool, recipient);
         } else {
@@ -200,9 +223,11 @@ contract LooongMarketsHandler is InvariantActionAccounting {
             hook.accountedWethClaims() * hook.REWARD_PRECISION(), hook.accountingLiabilityScaled(), "claims liabilities"
         );
         assertTrue(hook.claimsAreConserved(), "claims not conserved");
-        assertEq(baseFeesByMarket[0] + baseFeesByMarket[1], hook.totalBaseFeeLiability());
+        assertEq(feeTotals[pools[0]].unclaimedBase + feeTotals[pools[1]].unclaimedBase, hook.totalBaseFeeLiability());
 
         for (uint256 market; market < 2; ++market) {
+            _assertFeeRemainders(hook, pools[market], 1_001);
+            _assertFeeRemainders(hook, pools[market], 10_003);
             assertTrue(hook.poolIsLive(pools[market]));
             assertEq(PoolId.unwrap(router.poolKey(subjects[market]).toId()), PoolId.unwrap(pools[market]));
             uint256 custody;
@@ -219,6 +244,11 @@ contract LooongMarketsHandler is InvariantActionAccounting {
                 assertEq(position.initialBasis, position.remainingBasis + position.soldBasis + position.withdrawnBasis);
                 custody += position.remainingTokens;
                 if (position.rewardActive) shares += position.remainingTokens;
+            }
+            for (uint256 i; i < closedPositions[market].length; ++i) {
+                uint256 id = closedPositions[market][i];
+                assertEq(keccak256(abi.encode(_position(id))), keccak256(new bytes(12 * 32)), "closed record retained");
+                assertEq(PoolId.unwrap(hook.positionPools(id)), bytes32(0), "closed pool binding retained");
             }
             assertEq(hook.ownerShares(pools[market], address(this)), shares);
             assertEq(hook.totalCustodiedTokens(pools[market]), custody);

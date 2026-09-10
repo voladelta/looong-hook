@@ -62,3 +62,29 @@ The dapp boundary is complete when every supported write uses its production ent
 swaps use the intended router, the transaction state machine exposes no conflicting actions,
 simulation and wallet chain checks precede approval, receipt status and product postconditions
 determine success, and no address or pool parameter is duplicated outside the manifest.
+
+Startup has explicit loading, ready and error states. A failed manifest or RPC read disables
+actions and offers a retry. Wallet account, chain and disconnect events invalidate account-specific
+views. Each prepared write retains the provider and account that created its wallet client and
+rechecks both before submission. Closed positions are recognized before their cleared pool mapping
+is inspected; market changes clear the position ID, and claims refresh wallet/protocol state.
+
+## Browser regression gate
+
+`ui/browser.test.mjs` drives the production handlers against a fresh localhost deployment. It uses
+Anvil's unlocked disposable accounts, snapshots each test and restores the chain afterward. Run it
+with an existing Playwright and Chromium installation; Node must resolve `playwright` through its
+normal module lookup or `NODE_PATH`.
+
+```sh
+./scripts/devnet-up.sh
+./scripts/devnet-deploy.sh
+bun run ui:build
+bun run vite preview ui --host 127.0.0.1 --port 4173 --strictPort
+```
+
+In another terminal, run `bun run test:browser`. `BROWSER_APP_URL` overrides the default
+`http://127.0.0.1:4173`. The suite covers desktop and 320px renders, keyboard focus, startup recovery,
+full closures, claims with unrelated inspector inputs, market changes, wallet identity changes,
+provider replacement during a pending read, wallet rejection and a failed production simulation.
+Stop the preview server and run `./scripts/devnet-down.sh` after the suite finishes.
