@@ -67,8 +67,8 @@ if DEPLOYMENT_MANIFEST="$manifest" forge script script/TestnetDeploy.s.sol:Testn
     echo "wrong sender was accepted" >&2
     exit 1
 fi
-rg -q 'CreatorSenderMismatch' .devnet/testnet-sender-wrong.log
-if sed -n '/TestnetDeployScript::run()/,$p' .devnet/testnet-sender-wrong.log | rg -q '→ new '; then
+grep -Fq 'CreatorSenderMismatch' .devnet/testnet-sender-wrong.log
+if sed -n '/TestnetDeployScript::run()/,$p' .devnet/testnet-sender-wrong.log | grep -Fq '→ new '; then
     echo "wrong sender reached contract creation" >&2
     exit 1
 fi
@@ -81,8 +81,8 @@ if DEPLOYMENT_MANIFEST="$stale_manifest" forge script script/TestnetDeploy.s.sol
     echo "stale coordinator prediction was accepted" >&2
     exit 1
 fi
-rg -q 'InvalidManifest' .devnet/testnet-sender-stale.log
-if sed -n '/TestnetDeployScript::run()/,$p' .devnet/testnet-sender-stale.log | rg -q '→ new '; then
+grep -Fq 'InvalidManifest' .devnet/testnet-sender-stale.log
+if sed -n '/TestnetDeployScript::run()/,$p' .devnet/testnet-sender-stale.log | grep -Fq '→ new '; then
     echo "stale coordinator prediction reached contract creation" >&2
     exit 1
 fi
