@@ -15,6 +15,13 @@ The dapp consumes one generated deployment manifest rather than duplicating addr
   recipients and hook data explicitly.
 - Treat emitted events as indexing hints; read authoritative balances and claim state from contracts.
 
+The market picker stores subject-address hints and the selected subject under the chain, root and
+coordinator identity. Reloading or selecting a hint rechecks the RPC chain, coordinator/root binding,
+router PoolKey, live registration and decimals. A failed check leaves an actionable error. Position
+actions compare the authoritative `positionPools(positionId)` with the selected market before
+simulation. Launch confirmation checks the configured coordinator's receipt event and revalidates
+the market before saving it.
+
 ## Transaction flow
 
 Model each write as one serialized state machine: connect, switch chain, approve, execute, then
@@ -29,6 +36,12 @@ decoded contract failures into an actionable message while retaining diagnostic 
 
 Treat RPC reads as fallible: expose unavailable or stale state, bound receipt polling and retry
 idempotent reads through a deliberate fallback. A transaction hash is progress, not completion.
+
+The launch form calls `LooongMarketCoordinatorV1.openTokenMarket` directly. It binds the connected
+wallet as both declared creator and initial fee beneficiary, generates fresh creator salt entropy,
+and selects the emitted subject and PoolId only after the launch receipt succeeds. Subsequent buys,
+sells, rebates and reward reads carry that selected market identity explicitly; the shared root does
+not infer a user market from global state.
 
 ## Prove the render
 

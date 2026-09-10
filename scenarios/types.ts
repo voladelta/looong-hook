@@ -8,13 +8,14 @@ export interface DeploymentManifest {
     fee: number;
     tickSpacing: number;
   };
+  poolId: Hex;
   contracts: {
     hook: Address;
     poolManager: Address;
     router: Address;
-    looong: Address;
+    subject: Address;
     weth: Address;
-    launcher: Address;
+    coordinator: Address;
     factory: Address;
   };
 }
@@ -23,7 +24,13 @@ export interface TradeContext {
   account: LocalAccount;
   index: number;
   manifest: DeploymentManifest;
+  market: Market;
   publicClient: PublicClient;
+}
+
+export interface Market {
+  subject: Address;
+  poolId: Hex;
 }
 
 export interface PreparedTrade {

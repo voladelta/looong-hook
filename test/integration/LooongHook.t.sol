@@ -23,9 +23,9 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {LooongHook} from "../../src/LooongHook.sol";
 import {LooongHookFactory} from "../../src/LooongHookFactory.sol";
-import {LooongLaunchV1} from "../../src/LooongLaunchV1.sol";
 import {LooongRouter} from "../../src/LooongRouter.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
+import {LooongLaunchV1} from "../utils/LooongExistingTokenFixture.sol";
 
 contract LooongDonationRouter is IUnlockCallback {
     using SafeERC20 for IERC20;
@@ -108,8 +108,7 @@ contract LooongHookIntegrationTest is BaseTest {
         assertEq(key.fee, 3_000);
         assertEq(key.tickSpacing, 60);
         assertEq(uint160(address(hook)) & ((1 << 14) - 1), launcher.factory().REQUIRED_FLAGS());
-        assertTrue(hook.registered());
-        assertTrue(hook.initialized());
+        assertTrue(hook.poolIsLive(key.toId()));
         assertEq(address(router.looong()), address(looong));
         assertEq(address(router.weth()), address(weth));
 
@@ -256,12 +255,12 @@ contract LooongHookIntegrationTest is BaseTest {
         router.swapExactInput(false, 1 ether, 1, address(this), _priceLimit(false), uint64(block.timestamp));
         uint256 bobBefore = weth.balanceOf(bob);
         vm.prank(alice);
-        uint256 reward = hook.claimRewards(bob);
+        uint256 reward = hook.claimRewards(key.toId(), bob);
         assertGt(reward, 0);
         assertEq(weth.balanceOf(bob) - bobBefore, reward);
         vm.expectRevert(LooongHook.ClaimUnavailable.selector);
         vm.prank(alice);
-        hook.claimRewards(bob);
+        hook.claimRewards(key.toId(), bob);
         _assertConservation();
     }
 
@@ -303,14 +302,14 @@ contract LooongHookIntegrationTest is BaseTest {
 
         uint256 rebate = hook.sellerRebates(alice);
         uint256 aliceBefore = weth.balanceOf(alice);
-        hook.claimRebate(alice);
+        hook.claimRebate(key.toId(), alice);
         assertEq(weth.balanceOf(alice) - aliceBefore, rebate);
         assertEq(hook.sellerRebates(alice), 0);
 
         uint256 baseFees = hook.baseFeeLiability();
         uint256 bobBefore = weth.balanceOf(bob);
         vm.prank(beneficiary);
-        hook.claimBaseFees(bob);
+        hook.claimBaseFees(key.toId(), bob);
         assertEq(weth.balanceOf(bob) - bobBefore, baseFees);
         assertEq(hook.baseFeeLiability(), 0);
         _assertConservation();
@@ -341,10 +340,10 @@ contract LooongHookIntegrationTest is BaseTest {
         assertGt(hook.totalScaledRewardLiability(), scaledLiabilityBefore);
         vm.expectRevert(LooongHook.ClaimUnavailable.selector);
         vm.prank(alice);
-        hook.claimRewards(alice);
+        hook.claimRewards(key.toId(), alice);
         uint256 bobBefore = weth.balanceOf(bob);
         vm.prank(bob);
-        uint256 bobReward = hook.claimRewards(bob);
+        uint256 bobReward = hook.claimRewards(key.toId(), bob);
         assertGt(bobReward, 0);
         assertEq(weth.balanceOf(bob) - bobBefore, bobReward);
         _assertConservation();
@@ -451,7 +450,7 @@ contract LooongHookIntegrationTest is BaseTest {
         uint256 baseRemainder = hook.baseFeeRemainder();
         uint256 componentRemainder = hook.componentFeeRemainder();
         vm.prank(beneficiary);
-        hook.claimBaseFees(beneficiary);
+        hook.claimBaseFees(key.toId(), beneficiary);
         assertEq(hook.baseFeeRemainder(), baseRemainder);
         assertEq(hook.componentFeeRemainder(), componentRemainder);
         _assertConservation();
@@ -585,7 +584,7 @@ contract LooongHookIntegrationTest is BaseTest {
     }
 
     function _assertConservation() private view {
-        assertTrue(hook.custodyIsSolvent());
+        assertTrue(hook.custodyIsSolvent(key.toId()));
         assertTrue(hook.claimsAreConserved());
     }
 

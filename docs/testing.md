@@ -33,6 +33,13 @@ accounting proof.
 The swap matrix is complete when every supported quadrant passes through the real router and
 PoolManager, and each hostile or partial-fill case rolls back all affected state.
 
+`LooongMarketCoordinator.t.sol` and `LooongMarketsInvariant.t.sol` exercise the production
+coordinator and shared root across both subject orderings. The latter interleaves the full ordinary
+swap matrix, position lifecycle and claims across two pools, while tracking unsolicited WETH claims
+with an independent surplus counter through later swaps and redemptions. `LooongExistingTokenFixture.sol`
+retains the earlier two-sided-liquidity fixture for legacy router compatibility, arithmetic and
+multi-holder tests; it is not a deployment path.
+
 ## Account for stateful actions
 
 For every action class, handlers count attempts, successes, exact expected failures, and unexpected
@@ -53,6 +60,10 @@ an expected-failure counter.
 
 Stateful proof is complete when every attempted action is classified exactly once, every material
 class succeeds, conservation holds after each sequence, and unexpected failures are zero.
+
+`LooongInvariant.t.sol` also launches two subject tokens on opposite sides of WETH through the
+production coordinator. Both handlers share one hook and router while checking pool-bound positions,
+pool custody, action liveness and global WETH-claim conservation.
 
 ## Run the gates
 

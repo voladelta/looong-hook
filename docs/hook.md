@@ -31,17 +31,17 @@ delta owner, and recovery policy, and the hook enables only the callbacks those 
 Read only the symbols used by the chosen design. The pinned code is the implementation authority;
 external documentation is for a specifically missing current network fact, not startup research.
 
-## LOOONG/WETH swap map
+## Subject-token/WETH swap map
 
-The router derives `zeroForOne` from the sorted `LOOONG` and WETH addresses. Freeze this matrix
+The router derives `zeroForOne` from the selected subject token and WETH addresses. Freeze this matrix
 before you change fee deltas:
 
 | User operation | Input asset | `amountSpecified` | WETH lane |
 | --- | --- | --- | --- |
 | Buy, exact input | WETH | negative | specified |
 | Buy, exact output | WETH | positive | unspecified |
-| Sell, exact input | LOOONG | negative | unspecified |
-| Sell, exact output | LOOONG | positive | specified |
+| Sell, exact input | subject token | negative | unspecified |
+| Sell, exact output | subject token | positive | specified |
 
 Positive hook deltas mean the hook takes currency; PoolManager subtracts them from the router's
 delta. Prove the four rows against observed deltas and balances rather than duplicating this table
@@ -57,14 +57,14 @@ observed deltas, balances, liabilities, remainders, and rollback behavior.
 
 ## Deployment footprint
 
-Run `forge build --sizes` after the first compiling vertical slice. A runtime factory or router that
-references `type(Hook).creationCode` embeds that creation code and can exceed EIP-170 even when the
-hook itself fits. Keep large CREATE2 launch code in a constructor-only factory or a separate
-deployer, while the long-lived router remains small. Re-run the exact launch rollback proof after
-changing this boundary.
+Run `forge build --sizes` after the first compiling vertical slice. The CREATE2 factory stores the
+shared root's creation blob across bounded inert code stores because the complete blob is larger than
+one EIP-170 runtime. The factory concatenates both exact chunks before CREATE2 and authenticates the
+result through the complete creation-code hash. The router and market coordinator do not embed root
+creation code. Re-run the exact launch rollback proof after changing this boundary.
 
 Callback, launch or lifecycle work that grows with participants or storage must also pass the
 maximum-transaction gate in `docs/gas.md`; contract size alone does not establish executability.
 
-Deployment proof is complete when the hook and every long-lived launcher fit their applicable size
+Deployment proof is complete when the hook, code stores, factory, router and coordinator fit their applicable size
 limits and the exact launch path proves atomic rollback.

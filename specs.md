@@ -2,10 +2,11 @@
 
 ## 1. Purpose and status
 
-`looong-hook` is an immutable Uniswap v4 hook for a single `LOOONG/WETH` pool. It turns purchases made through its
-authenticated router into custodied, non-transferable positions with verifiable WETH cost basis. Position holders can
-sell from custody, withdraw their tokens, earn rewards after 30 days, and recover most or all of the hook's sell-side
-fee when their exit satisfies the rebate rules.
+`looong-hook` is Hookr's shared Uniswap v4 root for tokens launched in LOOONG mode. Every launch creates a distinct
+fixed-supply subject token and token/WETH pool while reusing one root and authenticated router. Purchases made through
+that router become pool-scoped, custodied, non-transferable positions with verifiable WETH cost basis. Position holders
+can sell from custody, withdraw their tokens, earn rewards after 30 days, and recover most or all of the hook's
+sell-side fee when their exit satisfies the rebate rules.
 
 This document specifies the behavior of the reference implementation. It is not an audit, deployment claim, or
 production-readiness statement.
@@ -13,9 +14,11 @@ production-readiness statement.
 ## 2. Naming
 
 - Product and repository name: `looong-hook`
-- Base asset name and symbol: `LOOONG`
+- Hook behavior and launch-mode name: `LOOONG`
+- Base asset: the subject token created by each launch
 - Quote asset: `WETH`
-- Suggested contract names: `LooongHook`, `LooongRouter`, `LooongHookFactory`, and `LooongLaunchV1`
+- Contract names: `LooongHook`, `LooongRouter`, `LooongHookFactory`, `LooongTokenV1`, and
+  `LooongMarketCoordinatorV1`
 
 All user-facing copy, metadata, deployment manifests, and contract adaptations must use these names.
 
@@ -23,10 +26,15 @@ All user-facing copy, metadata, deployment manifests, and contract adaptations m
 
 | Parameter | Value |
 | --- | ---: |
-| Pool | `LOOONG/WETH` |
+| Pool | launched subject token/WETH |
+| Subject supply | 1,000,000,000 tokens |
 | Uniswap v4 LP fee | 3,000 pips (0.30%) |
 | Tick spacing | 60 |
-| Initial liquidity range | Full range: ticks `-887220` to `887220` |
+| Initial liquidity range | One-sided 207,000-tick selling band anchored at the opening tick |
+| Token name | 1–64 UTF-8 bytes |
+| Token symbol | 1–16 UTF-8 bytes |
+| Token tagline | 0–160 UTF-8 bytes |
+| Token logo URI | 0–256 UTF-8 bytes |
 | Hook buy fee | 10 bps |
 | Hook sell fee | 300 bps |
 | Base protocol fee stream | 10 bps of gross WETH volume |
@@ -43,12 +51,13 @@ Uniswap LP fees are independent of the hook fees and are excluded from the calcu
 
 ### 4.1 Hook
 
-The hook owns the canonical pool configuration, validates swap callbacks, charges WETH-denominated fees, custodies
-`LOOONG` for verified positions, records cost basis, accounts for rebates and rewards, and enforces asset/liability
-conservation.
+The hook owns every registered pool configuration, validates swap callbacks, charges WETH-denominated fees, custodies
+subject tokens for verified positions, records cost basis, accounts for rebates and rewards, and enforces
+asset/liability conservation independently by PoolId.
 
-One hook instance must bind to exactly one canonical `PoolKey`. Its PoolManager, registrar, trusted router, WETH quote
-asset, fee rates, maturity period, and fee beneficiary are immutable.
+One shared hook instance binds to one PoolManager, registrar, trusted router, WETH quote asset, fee schedule and maturity
+period. Each PoolId permanently binds one distinct subject token and fee beneficiary. Pool-scoped position, remainder,
+rebate, share and reward state must never cross PoolIds.
 
 ### 4.2 Router
 
@@ -72,37 +81,41 @@ The factory deploys the hook with CREATE2 and accepts only addresses whose low b
 
 All other hook permissions must be disabled.
 
-### 4.4 Atomic launcher
+### 4.4 Token and market coordinator
 
-The launcher creates the router and factory before the permission-mined hook address is selected. A one-shot launch
-must then:
+The shared router and permission-mined root are installed once per chain. Each user-callable coordinator launch must:
 
-1. deploy the hook;
-2. register and initialize the exact `LOOONG/WETH` pool;
-3. pull bounded amounts of `LOOONG` and WETH from the caller;
-4. add two-sided, full-range initial liquidity;
-5. retain the liquidity position permanently in the launcher; and
-6. return unused token amounts to the caller.
+1. bind `msg.sender` as the token creator;
+2. deploy a fixed-supply subject token deterministically;
+3. register and initialize its exact token/WETH pool under the shared root;
+4. place the complete supply in a one-sided founding band without requiring creator WETH;
+5. retain the liquidity position permanently in the coordinator; and
+6. send liquidity-rounding residue to the dead address without reducing the fixed total supply.
 
-The caller must be the payer. An allowance alone must not authorize another address to launch with the payer's funds.
-The launcher exposes no liquidity removal, fee collection, rescue, ownership, upgrade, or arbitrary-call path.
+When the subject is currency0, the band runs from the opening tick to opening tick + 207,000.
+When the subject is currency1, it runs from opening tick - 207,000 to the opening tick. Both ends must
+remain within usable ticks `-887220` and `887220`. The coordinator holds no remaining subject tokens
+after launch and exposes no path to collect the founding position's LP fees.
+
+The caller must equal the declared creator. A repeated creator salt must revert atomically. The coordinator exposes no
+liquidity removal, rescue, ownership, upgrade, or arbitrary-call path.
 
 ## 5. Pool admission and token assumptions
 
 The hook must reject callbacks unless all of the following are true:
 
-- the pool has been registered;
+- the PoolId has been registered with its immutable subject token and beneficiary;
 - the callback originates from the immutable PoolManager;
-- the supplied `PoolKey` hashes to the registered canonical pool id;
+- the supplied `PoolKey` hashes to that registered PoolId;
 - the hook address in the key is the current hook;
 - currencies are distinct and correctly sorted;
 - one currency is the immutable WETH quote asset;
-- the other currency is `LOOONG`;
+- the other currency is the PoolId's registered subject token;
 - tick spacing is within Uniswap v4 bounds; and
 - the LP fee is valid and no greater than 999,998 pips, preserving exact-output compatibility.
 
-`LOOONG` must be a standard ERC-20 without rebasing or transfer fees. WETH is the only supported quote asset; native
-ETH is not supported.
+Coordinator-created subject tokens are standard fixed-supply ERC-20s without rebasing or transfer fees. WETH is the
+only supported quote asset; native ETH is not supported.
 
 ## 6. Swap modes
 
@@ -112,7 +125,7 @@ Verified routes are exact-input only.
 
 Before a swap, the trusted router stages a one-shot intent committing to:
 
-- canonical pool id;
+- registered pool id;
 - owner;
 - buy or sell kind;
 - position id;
@@ -132,7 +145,7 @@ Verified buy flow:
 
 1. The owner supplies exact-input WETH through the router.
 2. The hook charges the 10 bps buy fee.
-3. Actual `LOOONG` output is diverted into hook custody.
+3. Actual subject-token output is diverted into hook custody.
 4. A new position is created for the owner.
 5. The position's initial WETH basis is the executed gross WETH input, including the hook fee.
 
@@ -234,7 +247,7 @@ excluded from that distribution. The seller receives the full 290 bps component 
 - the exit has no eligible profit; or
 - no other mature holder is eligible to receive rewards.
 
-Rebates accrue as WETH liabilities keyed by seller and are claimed separately from swap output.
+Rebates accrue as WETH liabilities keyed by PoolId and seller and are claimed separately from swap output.
 
 ## 9. Maturity and rewards
 
@@ -267,14 +280,18 @@ Claims follow checks-effects-interactions and are protected from reentrancy:
 - A reward owner may claim whole-unit WETH rewards to a chosen nonzero recipient; scaled fractional credit remains.
 
 Fee collection is held as PoolManager ERC-6909 WETH claims. Redemption burns the exact claims before taking underlying
-WETH for the recipient. A failed redemption must restore the accrued liability by reverting the transaction.
+WETH for the recipient. A failed redemption must restore the accrued liability by reverting the transaction. Claims
+received without a matching protocol fee are surplus: they create no entitlement and cannot make accounted liabilities
+unclaimable.
 
 ## 11. Required accounting invariants
 
 The implementation must preserve all of the following after every successful external operation:
 
 ```text
-hook LOOONG balance >= total remaining position tokens
+hook subject balance >= total remaining position tokens in that subject's PoolId
+
+actual PoolManager WETH claims >= accounted WETH claims
 
 accounted WETH claims * 1e27
   = base-fee liability * 1e27
@@ -292,8 +309,11 @@ stream remainder =       (gross WETH * rate + prior remainder) % 1,000,000
 Claims never reset these remainders. Splitting the same accepted gross volume across swaps must not suppress the
 cumulative fee entitlement.
 
-Donations must not create fees, rewards, or positions. Accidental token transfers must not be treated as accounted
-assets.
+Accounted WETH claims are claims minted by the hook for collected fees, less claims burned for redemptions.
+The liabilities in the equality are summed across all PoolIds. Unsolicited ERC-6909 transfers or mints to
+the hook create surplus backing, leave liabilities unchanged, and must not block swaps or claims in any
+pool. Surplus has no redemption or rescue path. Donations must not create fees, rewards, or positions.
+Accidental token transfers must not be treated as accounted assets.
 
 ## 12. Security and failure requirements
 
@@ -301,8 +321,8 @@ The implementation must reject:
 
 - callbacks from any address other than the immutable PoolManager;
 - initialization by anyone other than the registrar/hook launch path;
-- a second pool registration or second launch;
-- any noncanonical pool key;
+- a second registration of the same PoolId;
+- any unregistered or mismatched pool key;
 - intent staging by an untrusted router;
 - expired, malformed, mismatched, replayed, or wrong-domain intents;
 - a position sell or withdrawal by a non-owner;
@@ -315,8 +335,8 @@ The implementation must reject:
 - unsupported base-token transfer behavior; and
 - any operation that breaks base custody or WETH claim conservation.
 
-Reentrancy protection is required around position withdrawals, claims, canonical registration, swap callbacks, and
-the one-shot launch. Unlock callbacks must bind their exact expected payload and lifecycle state.
+Reentrancy protection is required around position withdrawals, claims, pool registration, swap callbacks, and each
+atomic launch. Unlock callbacks must bind their exact expected payload and lifecycle state.
 
 ## 13. Deliberate exclusions
 
@@ -329,7 +349,7 @@ The reference design has no:
 - project treasury withdrawal;
 - ERC-721 representation of positions;
 - native ETH quote support;
-- generic token deployment, minting, metadata, or supply allocation;
+- arbitrary token implementations, post-launch minting, mutable metadata, or creator supply allocations;
 - same-pool swap initiated by the hook;
 - rescue, sweep, or arbitrary external call; or
 - recovery path for accidentally transferred unsupported assets.
@@ -343,7 +363,7 @@ review before production use.
 At minimum, the executable test suite must prove:
 
 - exact frozen parameters and callback permission bits;
-- atomic one-pool launch and permanently locked initial liquidity;
+- atomic launches of multiple subject pools under one root, with permanently locked one-sided founding liquidity;
 - verified buys create custodied positions with executed gross WETH basis;
 - partial and full sells conserve token amounts and basis;
 - free withdrawals return `LOOONG` and destroy proportional basis;
@@ -357,7 +377,8 @@ At minimum, the executable test suite must prove:
 - current exact-output witnesses work while stale, forged, and exact-input witnesses fail;
 - intent mutation, replay, expiry, wrong-router, wrong-pool, and wrong-manager calls fail;
 - claims cannot be redirected or repeated;
-- donations do not affect fees, rewards, or positions; and
+- donations do not affect fees, rewards, or positions or prevent subsequent swaps and claims;
+- selecting an earlier market after another launch or browser reload preserves authoritative pool identity; and
 - stateful sequences preserve token, basis, custody, and WETH-liability conservation.
 
 Independent static analysis, mainnet-fork lifecycle testing, gas profiling, economic review, security review, deployed

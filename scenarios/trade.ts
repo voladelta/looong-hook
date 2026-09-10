@@ -8,8 +8,9 @@ const routerAbi = [
     name: "buy",
     stateMutability: "nonpayable",
     inputs: [
+      { name: "subject", type: "address" },
       { name: "wethAmountIn", type: "uint128" },
-      { name: "looongAmountOutMinimum", type: "uint128" },
+      { name: "subjectAmountOutMinimum", type: "uint128" },
       { name: "sqrtPriceLimitX96", type: "uint160" },
       { name: "deadline", type: "uint64" },
     ],
@@ -22,13 +23,19 @@ const maxSqrtPrice = 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_9
 
 export async function prepareTrade(context: TradeContext): Promise<PreparedTrade> {
   const block = await context.publicClient.getBlock();
-  const wethIsCurrency0 = BigInt(context.manifest.contracts.weth) < BigInt(context.manifest.contracts.looong);
+  const wethIsCurrency0 = BigInt(context.manifest.contracts.weth) < BigInt(context.market.subject);
   return {
     to: context.manifest.contracts.router,
     data: encodeFunctionData({
       abi: routerAbi,
       functionName: "buy",
-      args: [parseEther("0.01"), 1n, wethIsCurrency0 ? minSqrtPrice + 1n : maxSqrtPrice - 1n, block.timestamp + 600n],
+      args: [
+        context.market.subject,
+        parseEther("0.01"),
+        1n,
+        wethIsCurrency0 ? minSqrtPrice + 1n : maxSqrtPrice - 1n,
+        block.timestamp + 600n,
+      ],
     }),
   };
 }
